@@ -52,7 +52,8 @@ from utils.cluster.cluster_algorithms import (
     cluster_hdbscan,
     cluster_kmeans,
     cluster_agglomerative,
-    cluster_spectral
+    cluster_spectral,
+    cluster_with_stats
 )
 from utils.cluster.graph_clustering import (
     graph_threshold_clustering,
@@ -992,45 +993,20 @@ def resolve_innovation_duplicates(
 
     method_lower = method.lower()
     if method_lower in {"hdbscan", "kmeans", "agglomerative", "spectral"}:
-        # -------- 1) 平面簇算法 --------
-        if method_lower == "hdbscan":
-            min_cluster_size = method_kwargs.get("min_cluster_size", 2)
-            metric = method_kwargs.get("metric", "cosine")
-            cluster_selection_method = method_kwargs.get("cluster_selection_method", "eom")
-            labels = cluster_hdbscan(
-                embedding_matrix=embedding_matrix,
-                min_cluster_size=min_cluster_size,
-                metric=metric,
-                cluster_selection_method=cluster_selection_method
-            )
-        elif method_lower == "kmeans":
-            n_clusters = method_kwargs.get("n_clusters", 450)
-            random_state = method_kwargs.get("random_state", 42)
-            labels = cluster_kmeans(
-                embedding_matrix=embedding_matrix,
-                n_clusters=n_clusters,
-                random_state=random_state
-            )
-        elif method_lower == "agglomerative":
-            n_clusters = method_kwargs.get("n_clusters", 450)
-            affinity = method_kwargs.get("affinity", "cosine")
-            linkage = method_kwargs.get("linkage", "average")
-            labels = cluster_agglomerative(
-                embedding_matrix=embedding_matrix,
-                n_clusters=n_clusters,
-                affinity=affinity,
-                linkage=linkage
-            )
-        else:  # spectral
-            n_clusters = method_kwargs.get("n_clusters", 450)
-            affinity = method_kwargs.get("affinity", "nearest_neighbors")
-            n_neighbors = method_kwargs.get("n_neighbors", 10)
-            labels = cluster_spectral(
-                embedding_matrix=embedding_matrix,
-                n_clusters=n_clusters,
-                affinity=affinity,
-                n_neighbors=n_neighbors
-            )
+        # -------- 1) 平面簇算法 - 使用统一接口 --------
+        labels, stats = cluster_with_stats(
+            embedding_matrix=embedding_matrix,
+            method=method_lower,
+            **method_kwargs
+        )
+        
+        # 打印聚类统计信息
+        print(f"✅ 聚类完成 [{stats['method'].upper()}]:")
+        print(f"   📊 簇数量: {stats['n_clusters']}")
+        print(f"   ⚠️  噪音点: {stats['n_noise']} ({stats['n_noise']/stats['total_samples']*100:.1f}%)")
+        print(f"   📈 最大簇: {stats['largest_cluster']} 样本")
+        print(f"   📉 最小簇: {stats['smallest_cluster']} 样本")
+        print(f"   🔢 总样本: {stats['total_samples']}")
 
         # 把 label -> cluster 成员映射出来
         clusters: Dict[int, List[str]] = {}

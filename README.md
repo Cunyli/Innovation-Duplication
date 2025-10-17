@@ -18,6 +18,7 @@ This project addresses the challenge of identifying and consolidating innovation
 |----------|-------------|
 | **[Getting Started](docs/GETTING_STARTED.md)** | Setup, configuration & troubleshooting |
 | **[Development](docs/DEVELOPMENT.md)** | Project structure & development guide |
+| **[Clustering](docs/CLUSTERING.md)** | Clustering algorithms & API reference |
 | **[Documentation Index](docs/README.md)** | Full documentation overview |
 
 ## Challenge Description
@@ -47,12 +48,12 @@ Innovation-Duplication/
 │   └── generate_config_from_toml.py
 ├── tests/                      # ⭐ Test suite
 │   ├── test_azure_connection.py
-│   └── test_cluster.py
+│   └── test_cluster.py         # Clustering algorithm tests
 ├── docs/                       # ⭐ Documentation
-│   ├── QUICKSTART.md
-│   ├── CONFIGURATION.md
-│   ├── PROJECT_STRUCTURE.md
-│   └── MIGRATION_GUIDE.md
+│   ├── GETTING_STARTED.md      # Quick setup guide
+│   ├── DEVELOPMENT.md          # Development guide
+│   ├── CLUSTERING.md           # Clustering algorithms guide
+│   └── README.md               # Documentation index
 ├── data/                       # Data files (git-ignored)
 │   ├── dataframes/             # Source dataframes
 │   ├── entity_glossary/        # Organization name resolution
@@ -61,7 +62,9 @@ Innovation-Duplication/
 ├── evaluation/                 # Evaluation files
 ├── results/                    # Output results
 ├── utils/                      # Utility modules
-│   └── cluster/                # Clustering algorithms
+│   └── cluster/                # ⭐ Clustering algorithms
+│       ├── cluster_algorithms.py  # Vector-based clustering
+│       └── graph_clustering.py    # Graph-based clustering
 ├── .env                        # ⭐ Environment configuration (git-ignored)
 ├── .env.template               # Configuration template
 ├── app.py                      # 🚀 Streamlit web application
@@ -71,7 +74,7 @@ Innovation-Duplication/
 └── README.md                   # This file
 ```
 
-**💡 See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for detailed structure documentation.**
+**💡 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed structure documentation.**
 
 ## ⚙️ Setup
 
@@ -251,34 +254,26 @@ The solution uses semantic similarity through embeddings to identify when differ
 
 ### Innovation Duplicate Detection & Knowledge Graph
 
-A lightweight pipeline to detect semantically duplicate innovations via embedding‐based clustering (HDBSCAN) and build a consolidated innovation–organization knowledge graph.
+A lightweight pipeline to detect semantically duplicate innovations via embedding-based clustering and build a consolidated innovation-organization knowledge graph.
 
-1. **HDBSCAN Overview**
-HDBSCAN (Hierarchical Density‐Based Spatial Clustering of Applications with Noise)
-	-	No preset k: Automatically determines cluster count.
-	-	Variable‐density & arbitrary‐shape clusters: Handles small, unevenly sized duplicate groups.
-	-	Noise detection: Unique (non‐duplicate) innovations remain unclustered.
-	-	Membership probability: Each point obtains a “strength” score for belonging to its cluster.
-	-	Why HDBSCAN works here
-	-	Duplicate innovation records often form small, dense pockets in 1536-dimensional text‐embedding space.
-	-	HDBSCAN isolates outliers (non-duplicates) without forcing them into a cluster.
-	-	We normalize embeddings (cosine → Euclidean) and tune min_cluster_size=2 by default.
+**Key Features:**
+- Multiple clustering algorithms (HDBSCAN, K-Means, Agglomerative, Spectral)
+- Graph-based clustering (Threshold, K-Core)
+- Unified API interface via `cluster_with_stats()`
+- Automatic noise detection and statistics
 
-2. **Experience result**
-  - Total nodes from all Grah: 4076
-  - Total edges: 9287
-  - Innovations: 1735(HDBSCAN) to 2000(setting needed for some clusters way)
-  - Organizations: 2490
+**Performance Benchmarks** (~2000 innovation samples):
 
-Baseline: Raw Threshold Clustering (Connected Components): Created knowledge graph with 1911 innovations, 2490 organizations, and 12502 relationships
-HDBSCAN (min_cluster_size=2, cosine metric): Created knowledge graph with 1735 innovations, 2490 organizations, and 12341 relationships
-K-Means (k = 1911): Created knowledge graph with 1911 innovations, 2490 organizations, and 12544 relationships
-Agglomerative Hierarchical Clustering (n_clusters = 1911): Created knowledge graph with 1911 innovations, 2490 organizations, and 12544 relationships
-Spectral Clustering (n_clusters = 1911, n_neighbors = 15): Created knowledge graph with 1911 innovations, 2490 organizations, and 12612 relationships
+| Method | Innovations | Organizations | Relationships | Notes |
+|--------|------------|---------------|---------------|-------|
+| Threshold | 1911 | 2490 | 12502 | Baseline |
+| HDBSCAN | 1735 | 2490 | 12341 | Most conservative |
+| K-Means | 1911 | 2490 | 12544 | Stable results |
+| Agglomerative | 1911 | 2490 | 12544 | Hierarchical |
+| Spectral | 1911 | 2490 | 12612 | Complex structures |
 
-3. **API utils**
-ALL the cluster we try have been packaged into API form, which includes HDBSCAN, K-Means, Agglomerative Hierarchical Clustering, Spectral Clustering, Faiss‐Based Nearest Neighbors + Graph Clustering and Pure Graph Clustering (Threshold + Connected Components / k-Core). Using Pure Graph Clustering to get the initial cluster numbers for all the cluster methods that needed to be preinputed first.
- 
+**See [docs/CLUSTERING.md](docs/CLUSTERING.md) for detailed algorithm documentation and usage examples.**
+
 
 ### Caching System
 

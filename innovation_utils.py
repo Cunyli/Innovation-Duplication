@@ -73,7 +73,7 @@ def create_innovation_features(innovation_id: str,
     Returns:
         str: Feature string for the innovation
     """
-    features = f"{name}: {description}"
+    features = f"{name} with {innovation_id} ID: {description}"
     
     if developed_by and len(developed_by) > 0:
         features += f" Developed by: {', '.join(developed_by)}"
