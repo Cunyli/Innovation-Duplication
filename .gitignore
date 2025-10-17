@@ -1,5 +1,11 @@
 # Data and sensitive files
-data/
+# Ignore all data directory contents by default
+data/*
+# But allow specific code module directories
+!data/loaders/
+!data/loaders/**
+!data/processors/
+!data/processors/**
 keys/
 logs/
 # results/
@@ -47,6 +53,8 @@ Thumbs.db
 *.tar.bz2
 *.csv
 
-# Template exceptions
+# Config and template exceptions
+config/*.json
+!config/*_template.json
 !evaluation/*_template.json
 !evaluation/*_template.csv

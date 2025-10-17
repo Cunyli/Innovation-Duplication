@@ -8,12 +8,15 @@ Complete documentation for the Innovation-Duplication project.
 |----------|-------------|-----------|
 | **[GETTING_STARTED.md](GETTING_STARTED.md)** | Setup, configuration, and first run | 10 min |
 | **[DEVELOPMENT.md](DEVELOPMENT.md)** | Project structure and development guide | 15 min |
+| **[DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md)** | Data pipeline modularization guide | 20 min |
+| **[CLUSTERING.md](CLUSTERING.md)** | Graph clustering algorithms | 10 min |
 
 ## 🚀 Quick Links
 
 ### I want to...
 - **Get started quickly** → [GETTING_STARTED.md](GETTING_STARTED.md)
 - **Understand the code** → [DEVELOPMENT.md](DEVELOPMENT.md#project-structure)
+- **Learn about refactoring** → [DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md)
 - **Configure API keys** → [GETTING_STARTED.md](GETTING_STARTED.md#configure-environment)
 - **Test my setup** → [GETTING_STARTED.md](GETTING_STARTED.md#test-configuration)
 - **Troubleshoot issues** → [GETTING_STARTED.md](GETTING_STARTED.md#troubleshooting)
@@ -30,7 +33,8 @@ Complete documentation for the Innovation-Duplication project.
 ### Developers
 1. Review [GETTING_STARTED.md](GETTING_STARTED.md) for setup
 2. Study [DEVELOPMENT.md](DEVELOPMENT.md) for architecture
-3. Check component-specific READMEs:
+3. Read [DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md) for data pipeline modules
+4. Check component-specific READMEs:
    - [config/README.md](../config/README.md) - Configuration API
    - [tests/README.md](../tests/README.md) - Test suite
 

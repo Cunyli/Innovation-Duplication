@@ -60,6 +60,21 @@ from utils.cluster.graph_clustering import (
     graph_kcore_clustering
 )
 
+# Import cache module
+from core.cache import (
+    CacheBackend,
+    JsonFileCache,
+    MemoryCache,
+    EmbeddingCache,
+    CacheFactory
+)
+
+# Import data loaders
+from data.loaders import GraphDocumentLoader, NodeMapper
+
+# Import data processors
+from data.processors import RelationshipProcessor
+
 # Constants
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
@@ -79,297 +94,6 @@ except Exception as e:
 
 # Set up plotting style
 sns.set_theme(style="whitegrid")
-
-# 添加缓存模块
-class CacheBackend(Protocol):
-    """缓存后端接口协议"""
-    
-    def load(self) -> Dict:
-        """加载缓存数据"""
-        ...
-    
-    def save(self, data: Dict) -> bool:
-        """保存数据到缓存"""
-        ...
-    
-    def get(self, key: str) -> Optional[Any]:
-        """获取缓存项"""
-        ...
-    
-    def set(self, key: str, value: Any) -> None:
-        """设置缓存项"""
-        ...
-    
-    def update(self, data: Dict) -> None:
-        """批量更新缓存"""
-        ...
-    
-    def get_missing_keys(self, required_keys: List[str]) -> List[str]:
-        """获取缓存中缺失的键"""
-        ...
-    
-    def contains(self, key: str) -> bool:
-        """检查缓存是否包含指定键"""
-        ...
-
-
-class JsonFileCache:
-    """基于JSON文件的缓存实现"""
-    
-    def __init__(self, cache_path: str):
-        self.cache_path = cache_path
-        self.cache_data = {}
-        self.loaded = False
-    
-    def load(self) -> Dict:
-        if self.loaded:
-            return self.cache_data
-            
-        if os.path.exists(self.cache_path):
-            try:
-                with open(self.cache_path, "r", encoding="utf-8") as f:
-                    self.cache_data = json.load(f)
-                print(f"Loaded {len(self.cache_data)} items from cache at {self.cache_path}")
-                self.loaded = True
-                return self.cache_data
-            except Exception as e:
-                print(f"Error loading cache: {e}")
-                return {}
-        else:
-            print(f"Cache file not found at {self.cache_path}")
-            return {}
-    
-    def save(self, data: Dict) -> bool:
-        try:
-            # 确保目录存在
-            cache_dir = os.path.dirname(self.cache_path)
-            if cache_dir and not os.path.exists(cache_dir):
-                os.makedirs(cache_dir)
-                
-            with open(self.cache_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"Saved {len(data)} items to cache at {self.cache_path}")
-            self.cache_data = data
-            self.loaded = True
-            return True
-        except Exception as e:
-            print(f"Error saving cache: {e}")
-            return False
-    
-    def get(self, key: str) -> Optional[Any]:
-        if not self.loaded:
-            self.load()
-        return self.cache_data.get(key, None)
-    
-    def set(self, key: str, value: Any) -> None:
-        if not self.loaded:
-            self.load()
-        self.cache_data[key] = value
-    
-    def update(self, data: Dict) -> None:
-        if not self.loaded:
-            self.load()
-        self.cache_data.update(data)
-        self.save(self.cache_data)
-    
-    def get_missing_keys(self, required_keys: List[str]) -> List[str]:
-        if not self.loaded:
-            self.load()
-        return [k for k in required_keys if k not in self.cache_data]
-    
-    def contains(self, key: str) -> bool:
-        if not self.loaded:
-            self.load()
-        return key in self.cache_data
-
-
-class MemoryCache:
-    """基于内存的缓存实现"""
-    
-    def __init__(self):
-        self.cache_data = {}
-    
-    def load(self) -> Dict:
-        return self.cache_data
-    
-    def save(self, data: Dict) -> bool:
-        self.cache_data = data
-        return True
-    
-    def get(self, key: str) -> Optional[Any]:
-        return self.cache_data.get(key, None)
-    
-    def set(self, key: str, value: Any) -> None:
-        self.cache_data[key] = value
-    
-    def update(self, data: Dict) -> None:
-        self.cache_data.update(data)
-    
-    def get_missing_keys(self, required_keys: List[str]) -> List[str]:
-        return [k for k in required_keys if k not in self.cache_data]
-    
-    def contains(self, key: str) -> bool:
-        return key in self.cache_data
-
-class EmbeddingCache:
-    """
-    可插拔的嵌入向量缓存系统，支持不同的存储后端。
-    
-    当前支持:
-    - 文件缓存 (JSON)
-    - 内存缓存
-    
-    可扩展支持:
-    - 数据库缓存
-    - 分布式缓存
-    """
-    
-    def __init__(self, backend: Optional[CacheBackend] = None, cache_path: str = "./embedding_vectors.json", 
-                backend_type: str = "json", use_cache: bool = True):
-        """
-        初始化嵌入缓存系统。
-        
-        Args:
-            backend: 自定义缓存后端实现
-            cache_path: 缓存文件路径 (仅用于文件缓存)
-            backend_type: 后端类型 ('json' 或 'memory')
-            use_cache: 是否启用缓存
-        """
-        self.use_cache = use_cache
-        
-        if not use_cache:
-            self.backend = None
-            return
-            
-        if backend is not None:
-            self.backend = backend
-        elif backend_type == "json":
-            self.backend = JsonFileCache(cache_path)
-        elif backend_type == "memory":
-            self.backend = MemoryCache()
-        else:
-            raise ValueError(f"Unsupported backend type: {backend_type}")
-    
-    def load(self) -> Dict:
-        """
-        加载缓存数据。
-        
-        Returns:
-            Dict: 加载的缓存数据
-        """
-        if not self.use_cache or self.backend is None:
-            return {}
-        return self.backend.load()
-    
-    def save(self, data: Dict) -> bool:
-        """
-        保存数据到缓存。
-        
-        Args:
-            data: 要保存的数据
-            
-        Returns:
-            bool: 是否成功保存
-        """
-        if not self.use_cache or self.backend is None:
-            return False
-        return self.backend.save(data)
-    
-    def get(self, key: str) -> Optional[Any]:
-        """
-        从缓存获取值。
-        
-        Args:
-            key: 缓存键
-            
-        Returns:
-            Optional[Any]: 缓存的值，如不存在返回None
-        """
-        if not self.use_cache or self.backend is None:
-            return None
-        return self.backend.get(key)
-    
-    def set(self, key: str, value: Any) -> None:
-        """
-        设置缓存值。
-        
-        Args:
-            key: 缓存键
-            value: 要缓存的值
-        """
-        if not self.use_cache or self.backend is None:
-            return
-        self.backend.set(key, value)
-    
-    def update(self, data: Dict) -> None:
-        """
-        批量更新缓存。
-        
-        Args:
-            data: 要更新的数据
-        """
-        if not self.use_cache or self.backend is None:
-            return
-        self.backend.update(data)
-    
-    def get_missing_keys(self, required_keys: List[str]) -> List[str]:
-        """
-        获取缓存中缺失的键。
-        
-        Args:
-            required_keys: 需要的键列表
-            
-        Returns:
-            List[str]: 缓存中不存在的键列表
-        """
-        if not self.use_cache or self.backend is None:
-            return required_keys
-        return self.backend.get_missing_keys(required_keys)
-    
-    def contains(self, key: str) -> bool:
-        """
-        检查缓存是否包含指定键。
-        
-        Args:
-            key: 要检查的键
-            
-        Returns:
-            bool: 是否存在
-        """
-        if not self.use_cache or self.backend is None:
-            return False
-        return self.backend.contains(key)
-
-
-class CacheFactory:
-    """缓存工厂，用于创建不同类型的缓存实例"""
-    
-    @staticmethod
-    def create_cache(cache_type: str = "embedding", 
-                    backend_type: str = "json",
-                    cache_path: str = "./embedding_vectors.json",
-                    use_cache: bool = True) -> Union[EmbeddingCache, Any]:
-        """
-        创建缓存实例。
-        
-        Args:
-            cache_type: 缓存类型 ('embedding' 或自定义)
-            backend_type: 后端类型 ('json' 或 'memory')
-            cache_path: 缓存文件路径
-            use_cache: 是否启用缓存
-            
-        Returns:
-            Union[EmbeddingCache, Any]: 缓存实例
-        """
-        if cache_type == "embedding":
-            return EmbeddingCache(
-                backend_type=backend_type,
-                cache_path=cache_path,
-                use_cache=use_cache
-            )
-        else:
-            raise ValueError(f"Unsupported cache type: {cache_type}")
-
 
 # 添加通用的文本过滤器
 def is_valid_entity_name(name: str) -> bool:
@@ -553,6 +277,8 @@ def load_and_combine_data() -> Tuple[pd.DataFrame, List[Dict], List[Dict]]:
     Returns:
         Tuple of (combined dataframe, all_pred_entities, all_pred_relations)
     """
+    from data.processors import DataSourceProcessor
+    
     print("Loading data from company websites...")
     
     # Initialize lists to collect predicted entities and relationships
@@ -564,113 +290,63 @@ def load_and_combine_data() -> Tuple[pd.DataFrame, List[Dict], List[Dict]]:
     df_company = df_company[df_company['Website'].str.startswith('www.')]
     df_company['source_index'] = df_company.index
 
-    # Extract relationship triplets from company domain
-    df_relationships_comp_url = pd.DataFrame()
+    # Create company data processor
+    company_processor = DataSourceProcessor(
+        graph_docs_dir=GRAPH_DOCS_COMPANY,
+        data_source_name="company_website"
+    )
     
-    with tqdm(total=len(df_company), desc="Processing company data") as pbar:
-        for i, row in df_company.iterrows():
-            try:
-                file_path = os.path.join(GRAPH_DOCS_COMPANY, f"{row['Company name'].replace(' ','_')}_{i}.pkl")
-                if os.path.exists(file_path):
-                    with open(file_path, 'rb') as f:
-                        graph_docs = pickle.load(f)
-                        graph_doc = graph_docs[0]
-                    
-                    # Extract and collect entities
-                    extract_entities_from_document(graph_doc, all_pred_entities)
-                    
-                    # Extract and collect relationships
-                    extract_relationships_from_document(graph_doc, all_pred_relations)
-                    
-                    node_description = {}
-                    node_en_id = {}
-                    for node in graph_doc.nodes:
-                        node_description[node.id] = node.properties['description']
-                        node_en_id[node.id] = node.properties['english_id']
-
-                    relationship_rows = []
-                    for j in range(len(graph_doc.relationships)):
-                        rel = graph_doc.relationships[j]
-                        relationship_rows.append({
-                            "Document number": row['source_index'],
-                            "Source Company": row["Company name"],
-                            "relationship description": rel.properties['description'],
-                            "source_id": rel.source,
-                            "source_type": rel.source_type,
-                            "source_english_id": node_en_id.get(rel.source, None),
-                            "source_description": node_description.get(rel.source, None),
-                            "relationship_type": rel.type,
-                            "target_id": rel.target,
-                            "target_type": rel.target_type,
-                            "target_english_id": node_en_id.get(rel.target, None),
-                            "target_description": node_description.get(rel.target, None),
-                            "Link Source Text": row["Link"],
-                            "Source Text": row["text_content"],
-                            "data_source": "company_website"
-                        })
-
-                    df_relationships_comp_url = pd.concat([df_relationships_comp_url, pd.DataFrame(relationship_rows)], ignore_index=True)
-            except Exception as e:
-                print(f"Error processing {i}: {e}")
-            pbar.update(1)
+    # Define metadata mapper for company data
+    def company_metadata_mapper(row, idx):
+        return {
+            "Document number": row['source_index'],
+            "Source Company": row["Company name"],
+            "Link Source Text": row["Link"],
+            "Source Text": row["text_content"],
+            "data_source": "company_website"
+        }
     
-    print(f"Processed {len(df_relationships_comp_url)} relationships from company websites")
+    # Process company data
+    df_relationships_comp_url = company_processor.process(
+        df=df_company,
+        file_pattern="{Company name}_{index}.pkl",
+        metadata_mapper=company_metadata_mapper,
+        entity_extractor=extract_entities_from_document,
+        relation_extractor=extract_relationships_from_document,
+        pred_entities=all_pred_entities,
+        pred_relations=all_pred_relations
+    )
     
     # Load VTT domain data
     print("Loading data from VTT domain...")
     df_vtt_domain = pd.read_csv(os.path.join(DATAFRAMES_DIR, 'comp_mentions_vtt_domain.csv'))
     
-    # Extract relationship triplets from VTT domain
-    df_relationships_vtt_domain = pd.DataFrame()
+    # Create VTT data processor
+    vtt_processor = DataSourceProcessor(
+        graph_docs_dir=GRAPH_DOCS_VTT,
+        data_source_name="vtt_website"
+    )
     
-    with tqdm(total=len(df_vtt_domain), desc="Processing VTT domain data") as pbar:
-        for index_source, row in df_vtt_domain.iterrows():
-            try:
-                file_path = os.path.join(GRAPH_DOCS_VTT, f"{row['Vat_id'].replace(' ','_')}_{index_source}.pkl")
-                if os.path.exists(file_path):
-                    with open(file_path, 'rb') as f:
-                        graph_docs = pickle.load(f)
-                        graph_doc = graph_docs[0]
-                    
-                    # Extract and collect entities
-                    extract_entities_from_document(graph_doc, all_pred_entities)
-                    
-                    # Extract and collect relationships
-                    extract_relationships_from_document(graph_doc, all_pred_relations)
-                    
-                    node_description = {}
-                    node_en_id = {}
-                    for node in graph_doc.nodes:
-                        node_description[node.id] = node.properties['description']
-                        node_en_id[node.id] = node.properties['english_id']
-
-                    relationship_rows = []
-                    for j in range(len(graph_doc.relationships)):
-                        rel = graph_doc.relationships[j]
-                        relationship_rows.append({
-                            "Document number": index_source,
-                            "VAT id": row["Vat_id"],
-                            "relationship description": rel.properties['description'],
-                            "source_id": rel.source,
-                            "source_type": rel.source_type,
-                            "source_english_id": node_en_id.get(rel.source, None),
-                            "source_description": node_description.get(rel.source, None),
-                            "relationship_type": rel.type,
-                            "target_id": rel.target,
-                            "target_type": rel.target_type,
-                            "target_english_id": node_en_id.get(rel.target, None),
-                            "target_description": node_description.get(rel.target, None),
-                            "Link Source Text": row["source_url"],
-                            "Source Text": row["main_body"],
-                            "data_source": "vtt_website"
-                        })
-
-                    df_relationships_vtt_domain = pd.concat([df_relationships_vtt_domain, pd.DataFrame(relationship_rows)], ignore_index=True)
-            except Exception as e:
-                print(f"Error processing {index_source}: {e}")
-            pbar.update(1)
+    # Define metadata mapper for VTT data
+    def vtt_metadata_mapper(row, idx):
+        return {
+            "Document number": idx,
+            "VAT id": row["Vat_id"],
+            "Link Source Text": row["source_url"],
+            "Source Text": row["main_body"],
+            "data_source": "vtt_website"
+        }
     
-    print(f"Processed {len(df_relationships_vtt_domain)} relationships from VTT domain")
+    # Process VTT data
+    df_relationships_vtt_domain = vtt_processor.process(
+        df=df_vtt_domain,
+        file_pattern="{Vat_id}_{index}.pkl",
+        metadata_mapper=vtt_metadata_mapper,
+        entity_extractor=extract_entities_from_document,
+        relation_extractor=extract_relationships_from_document,
+        pred_entities=all_pred_entities,
+        pred_relations=all_pred_relations
+    )
     
     # Rename columns to align dataframes
     df_relationships_vtt_domain = df_relationships_vtt_domain.rename(columns={"VAT id": "Source Company"})
@@ -683,103 +359,138 @@ def load_and_combine_data() -> Tuple[pd.DataFrame, List[Dict], List[Dict]]:
 
 
 def initialize_openai_client():
-    """初始化OpenAI客户端"""
+    """初始化OpenAI客户端，优先使用.env配置"""
     import json
+    from config.config_loader import load_config
     
     # 打印调试信息
     print("="*50)
     print("初始化OpenAI客户端...")
     print(f"当前工作目录: {os.getcwd()}")
-    print(f"DATA_DIR: {DATA_DIR}")
     
     try:
-        # 尝试从streamlit secrets获取配置
-        import streamlit as st
-        
-        print("尝试从st.secrets获取配置...")
-        if hasattr(st, 'secrets') and st.secrets:
-            print(f"st.secrets可用，包含以下键: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else 'No keys method'}")
-            if 'default_model' in st.secrets:
-                print(f"默认模型信息: {st.secrets['default_model']}")
-            if 'gpt-4.1-mini' in st.secrets:
-                print(f"模型配置包含键: {list(st.secrets['gpt-4.1-mini'].keys()) if hasattr(st.secrets['gpt-4.1-mini'], 'keys') else 'No keys method'}")
-            if 'azure-ai-search' in st.secrets:
-                print(f"向量存储配置包含键: {list(st.secrets['azure-ai-search'].keys()) if hasattr(st.secrets['azure-ai-search'], 'keys') else 'No keys method'}")
-        else:
-            print("st.secrets不可用")
-        
-        config = st.secrets
-        
-        # 如果streamlit secrets不可用，尝试从文件读取
-        if not config:
-            print("st.secrets为空，尝试从文件读取...")
-            # ✅ 优先从环境变量读取路径
-            config_path = os.environ.get("AZURE_CONFIG", os.path.join(DATA_DIR, 'keys', 'azure_config.json'))
-            print(f"尝试读取配置文件: {config_path}")
-            
-            if not os.path.exists(config_path):
-                print(f"API配置文件未找到: {config_path}")
-                print("请获取API密钥并按照README.md中的说明创建配置文件")
-                return None, None, None
-            
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-            print(f"从文件加载配置成功，包含键: {list(config.keys())}")
-        
-        dim = 3072
-        # 如果使用streamlit secrets，需要适配其结构
-        if hasattr(config, 'get'):
-            # 从st.secrets中获取
-            model_name = config.get('default_model', {}).get('name', 'gpt-4.1-mini')
-            model_config = config.get(model_name, {})
-            vector_store_name = 'azure-ai-search'
-            vector_store_config = config.get(vector_store_name, {})
-        else:
-            # 从JSON配置中获取
-            model_name = 'gpt-4.1-mini'
-            model_config = config.get(model_name, {})
-            vector_store_name = 'azure-ai-search'
-            vector_store_config = config.get(vector_store_name, {})
-        
-        if model_config:
-            api_key = model_config.get('api_key')
-            api_base = model_config.get('api_base', '')
-            # 移除URL部分（如果存在）
-            base_endpoint = api_base.split('/openai')[0] if '/openai' in api_base else api_base
-            
-            llm = AzureChatOpenAI(
-                api_key=api_key,
-                azure_endpoint=base_endpoint,
-                azure_deployment=model_config.get('deployment'),
-                api_version=model_config.get('api_version'),
-                temperature=0
-            )
-            
-            embedding_model = AzureOpenAIEmbeddings(
-                api_key=api_key,
-                azure_endpoint=base_endpoint,
-                azure_deployment=model_config.get('emb_deployment'),
-                api_version=model_config.get('api_version'),
-                dimensions=dim
-            )
-            
-            if vector_store_config:
-                vector_store = AzureSearch(
-                    azure_search_endpoint = vector_store_config.get('azure_endpoint'),
-                    azure_search_key = vector_store_config.get('api_key'),
-                    index_name = vector_store_config.get('index_name'),
-                    embedding_function = embedding_model
-                )
-                
-                return llm, embedding_model, vector_store
+        # 尝试从streamlit secrets获取配置（用于Web应用）
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and st.secrets and 'AZURE_OPENAI_API_KEY' in st.secrets:
+                print("✅ 使用 Streamlit secrets 配置")
+                config = st.secrets
+                use_streamlit = True
             else:
-                print(f"Vector store {vector_store_name} configuration not found")
-                return llm, embedding_model, None
+                use_streamlit = False
+                config = None
+        except ImportError:
+            use_streamlit = False
+            config = None
+        
+        # 如果不是streamlit环境，使用config_loader加载配置
+        if not use_streamlit:
+            print("🔍 尝试从 .env 文件或 azure_config.json 加载配置...")
+            config = load_config(prefer_env=True)
+        
+        # 获取模型配置
+        if use_streamlit:
+            # Streamlit secrets 结构
+            model_name = config.get('default_model', {}).get('name', 'gpt-4o-mini')
+            if model_name in config:
+                model_config = config[model_name]
+            else:
+                # 直接使用根级配置
+                model_config = {
+                    'api_key': config.get('AZURE_OPENAI_API_KEY'),
+                    'api_base': config.get('AZURE_OPENAI_ENDPOINT'),
+                    'api_version': config.get('AZURE_OPENAI_API_VERSION'),
+                    'deployment': config.get('AZURE_OPENAI_DEPLOYMENT'),
+                    'emb_deployment': config.get('AZURE_OPENAI_EMBEDDING_DEPLOYMENT')
+                }
+            
+            if 'azure-ai-search' in config:
+                vector_store_config = config['azure-ai-search']
+            else:
+                vector_store_config = {
+                    'azure_endpoint': config.get('AZURE_AI_SEARCH_ENDPOINT'),
+                    'api_key': config.get('AZURE_AI_SEARCH_KEY'),
+                    'index_name': config.get('AZURE_AI_SEARCH_INDEX_NAME')
+                }
         else:
-            print(f"Model {model_name} configuration not found")
+            # 从.env或JSON加载的配置结构
+            model_name = 'gpt-4o-mini'
+            model_config = config.get(model_name, {})
+            vector_store_config = config.get('azure-ai-search', {})
+        
+        # 验证必需的配置
+        if not model_config or not model_config.get('api_key'):
+            print("❌ 错误: 未找到有效的 Azure OpenAI 配置")
+            print("请确保以下任一配置方式:")
+            print("  1. 在 .env 文件中设置 AZURE_OPENAI_API_KEY 等变量")
+            print("  2. 在 data/keys/azure_config.json 中配置")
+            print("  3. 使用 Streamlit secrets (仅限Web应用)")
             return None, None, None
+        
+        # 处理endpoint
+        api_base = model_config.get('api_base', '')
+        base_endpoint = api_base.split('/openai')[0] if '/openai' in api_base else api_base
+        if not base_endpoint.endswith('/'):
+            base_endpoint += '/'
+        
+        print(f"✅ 使用模型: {model_config.get('deployment')}")
+        print(f"✅ 使用嵌入模型: {model_config.get('emb_deployment')}")
+        
+        # 根据嵌入模型确定维度
+        emb_deployment = model_config.get('emb_deployment', '')
+        if 'text-embedding-3-large' in emb_deployment:
+            dim = 3072
+        elif 'text-embedding-3-small' in emb_deployment:
+            dim = 1536
+        elif 'text-embedding-ada-002' in emb_deployment:
+            dim = 1536
+        else:
+            # 默认使用 1536（最常见的维度）
+            dim = 1536
+            print(f"⚠️ 未识别的嵌入模型 '{emb_deployment}'，使用默认维度 {dim}")
+        
+        print(f"ℹ️  嵌入向量维度: {dim}")
+        
+        # 初始化LLM
+        llm = AzureChatOpenAI(
+            api_key=model_config.get('api_key'),
+            azure_endpoint=base_endpoint,
+            azure_deployment=model_config.get('deployment'),
+            api_version=model_config.get('api_version'),
+            temperature=0
+        )
+        
+        # 初始化嵌入模型
+        emb_api_version = model_config.get('emb_api_version', model_config.get('api_version'))
+        embedding_model = AzureOpenAIEmbeddings(
+            api_key=model_config.get('api_key'),
+            azure_endpoint=base_endpoint,
+            azure_deployment=model_config.get('emb_deployment'),
+            api_version=emb_api_version,
+            dimensions=dim
+        )
+        
+        # 初始化向量存储（可选）
+        vector_store = None
+        if vector_store_config and vector_store_config.get('api_key'):
+            try:
+                vector_store = AzureSearch(
+                    azure_search_endpoint=vector_store_config.get('azure_endpoint'),
+                    azure_search_key=vector_store_config.get('api_key'),
+                    index_name=vector_store_config.get('index_name'),
+                    embedding_function=embedding_model
+                )
+                print("✅ Azure AI Search 已配置")
+            except Exception as e:
+                print(f"⚠️ Azure AI Search 配置失败: {e}")
+                vector_store = None
+        else:
+            print("ℹ️  未配置 Azure AI Search (可选功能)")
+        
+        return llm, embedding_model, vector_store
+        
     except Exception as e:
-        print(f"Error initializing OpenAI client: {str(e)}")
+        print(f"❌ 初始化 OpenAI 客户端时出错: {str(e)}")
         import traceback
         traceback.print_exc()
         return None, None, None
