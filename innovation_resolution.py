@@ -26,14 +26,7 @@ from vis import visualize_network_tufte
 
 from langchain_openai import AzureChatOpenAI
 from langchain_openai import AzureOpenAIEmbeddings
-
-from langchain_openai import AzureChatOpenAI
-from langchain_openai import AzureOpenAIEmbeddings
-
-from langchain_community.vectorstores.azuresearch import AzureSearch
-
 from langchain_core.documents import Document
-
 from langchain.prompts import PromptTemplate
 
 
@@ -73,7 +66,20 @@ from core.cache import (
 from data.loaders import GraphDocumentLoader, NodeMapper
 
 # Import data processors
-from data.processors import RelationshipProcessor
+from data.processors import (
+    RelationshipProcessor,
+    is_valid_entity_name,
+    is_valid_relationship,
+    extract_entities_from_document,
+    extract_relationships_from_document,
+    initialize_openai_client,
+    get_embedding,
+    compute_similarity,
+    InnovationFeatureBuilder,
+    InnovationExtractor,
+    EmbeddingManager,
+    ClusteringStrategyFactory
+)
 
 # Constants
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -94,179 +100,6 @@ except Exception as e:
 
 # Set up plotting style
 sns.set_theme(style="whitegrid")
-
-# 添加通用的文本过滤器
-def is_valid_entity_name(name: str) -> bool:
-    """
-    检查实体名称是否有效，过滤掉明显无效的实体。
-    
-    Args:
-        name: 实体名称
-        
-    Returns:
-        bool: 是否是有效的实体名称
-    """
-    if not name or not isinstance(name, str):
-        return False
-    
-    # 过滤掉太短的名称
-    if len(name.strip()) < 3:
-        return False
-    
-    # 过滤掉只包含数字或特殊字符的名称
-    if all(not c.isalpha() for c in name):
-        return False
-    
-    # 过滤掉常见的占位符名称
-    invalid_patterns = [
-        'null', 'none', 'undefined', 'n/a', 'unknown', 
-        'temp_', 'unknown', 'placeholder', 'example'
-    ]
-    
-    name_lower = name.lower()
-    for pattern in invalid_patterns:
-        if pattern in name_lower:
-            # 特殊处理：如果是以temp_开头但后面有有意义的内容，仍然保留
-            if pattern == 'temp_' and len(name) > 10 and any(c.isalpha() for c in name[5:]):
-                continue
-            return False
-    
-    return True
-
-
-def extract_entities_from_document(doc, pred_entities: List[Dict] = None) -> List[Dict]:
-    """
-    Extract innovation and organization entities from document.
-    Also accumulate extracted entities in the pred_entities list if provided.
-    
-    Args:
-        doc: Source document
-        pred_entities: Optional list to accumulate extracted entities
-        
-    Returns:
-        List of entity dictionaries in the format {"name": str, "type": str}
-    """
-    entities = []
-    
-    # Extract entities from the document (assuming graph_doc format)
-    if hasattr(doc, 'nodes'):
-        for node in doc.nodes:
-            # 获取实体名称，优先使用english_id
-            entity_name = node.properties.get('english_id', node.id) if hasattr(node, 'properties') else node.id
-            
-            # 检查实体名称是否有效
-            if not is_valid_entity_name(entity_name):
-                continue
-                
-            entity = {
-                "name": entity_name,
-                "type": node.type
-            }
-            
-            # 添加描述信息，便于后续过滤和评估
-            if hasattr(node, 'properties') and 'description' in node.properties:
-                entity["description"] = node.properties['description']
-            
-            entities.append(entity)
-            
-            # Accumulate to prediction list if provided
-            if pred_entities is not None:
-                pred_entities.append(entity)
-    
-    return entities
-
-
-def is_valid_relationship(innovation: str, organization: str, relation_type: str) -> bool:
-    """
-    检查关系是否有效，过滤掉明显无效的关系。
-    
-    Args:
-        innovation: 创新名称
-        organization: 组织名称
-        relation_type: 关系类型
-        
-    Returns:
-        bool: 是否是有效的关系
-    """
-    # 检查创新和组织名称是否有效
-    if not is_valid_entity_name(innovation) or not is_valid_entity_name(organization):
-        return False
-    
-    # 检查关系类型是否有效
-    if relation_type not in ["DEVELOPED_BY", "COLLABORATION"]:
-        return False
-    
-    # 过滤掉创新和组织相同的情况
-    if innovation.lower() == organization.lower():
-        return False
-    
-    return True
-
-
-def extract_relationships_from_document(doc, pred_relations: List[Dict] = None) -> List[Dict]:
-    """
-    Extract relationships from document.
-    Also accumulate extracted relationships in the pred_relations list if provided.
-    
-    Args:
-        doc: Source document
-        pred_relations: Optional list to accumulate extracted relationships
-        
-    Returns:
-        List of relationship dictionaries in the format {"innovation": str, "organization": str, "relation": str}
-    """
-    relationships = []
-    
-    # Extract relationships from the document (assuming graph_doc format)
-    if hasattr(doc, 'relationships'):
-        # 首先获取节点的english_id映射
-        node_english_id = {}
-        if hasattr(doc, 'nodes'):
-            for node in doc.nodes:
-                if hasattr(node, 'properties') and 'english_id' in node.properties:
-                    node_english_id[node.id] = node.properties['english_id']
-                else:
-                    node_english_id[node.id] = node.id
-        
-        for rel in doc.relationships:
-            # 只包含DEVELOPED_BY和COLLABORATION关系
-            if rel.type in ["DEVELOPED_BY", "COLLABORATION"]:
-                # 获取源和目标的名称，优先使用english_id
-                source_name = node_english_id.get(rel.source, rel.source)
-                target_name = node_english_id.get(rel.target, rel.target)
-                
-                # 确保source/target是正确的创新/组织映射
-                if rel.source_type == "Innovation" and rel.target_type == "Organization":
-                    innovation_name = source_name
-                    organization_name = target_name
-                elif rel.source_type == "Organization" and rel.target_type == "Innovation":
-                    innovation_name = target_name
-                    organization_name = source_name
-                else:
-                    # 如果关系不是创新-组织之间的关系，跳过
-                    continue
-                
-                # 检查关系是否有效
-                if not is_valid_relationship(innovation_name, organization_name, rel.type):
-                    continue
-                
-                relationship = {
-                    "innovation": innovation_name,
-                    "organization": organization_name,
-                    "relation": rel.type
-                }
-                
-                # 添加描述信息，便于后续过滤和评估
-                if hasattr(rel, 'properties') and 'description' in rel.properties:
-                    relationship["description"] = rel.properties['description']
-                
-                relationships.append(relationship)
-                
-                # Accumulate to prediction list if provided
-                if pred_relations is not None:
-                    pred_relations.append(relationship)
-    
-    return relationships
 
 
 def load_and_combine_data() -> Tuple[pd.DataFrame, List[Dict], List[Dict]]:
@@ -358,221 +191,9 @@ def load_and_combine_data() -> Tuple[pd.DataFrame, List[Dict], List[Dict]]:
     return combined_df, all_pred_entities, all_pred_relations
 
 
-def initialize_openai_client():
-    """初始化OpenAI客户端，优先使用.env配置"""
-    import json
-    from config.config_loader import load_config
-    
-    # 打印调试信息
-    print("="*50)
-    print("初始化OpenAI客户端...")
-    print(f"当前工作目录: {os.getcwd()}")
-    
-    try:
-        # 尝试从streamlit secrets获取配置（用于Web应用）
-        try:
-            import streamlit as st
-            if hasattr(st, 'secrets') and st.secrets and 'AZURE_OPENAI_API_KEY' in st.secrets:
-                print("✅ 使用 Streamlit secrets 配置")
-                config = st.secrets
-                use_streamlit = True
-            else:
-                use_streamlit = False
-                config = None
-        except ImportError:
-            use_streamlit = False
-            config = None
-        
-        # 如果不是streamlit环境，使用config_loader加载配置
-        if not use_streamlit:
-            print("🔍 尝试从 .env 文件或 azure_config.json 加载配置...")
-            config = load_config(prefer_env=True)
-        
-        # 获取模型配置
-        if use_streamlit:
-            # Streamlit secrets 结构
-            model_name = config.get('default_model', {}).get('name', 'gpt-4o-mini')
-            if model_name in config:
-                model_config = config[model_name]
-            else:
-                # 直接使用根级配置
-                model_config = {
-                    'api_key': config.get('AZURE_OPENAI_API_KEY'),
-                    'api_base': config.get('AZURE_OPENAI_ENDPOINT'),
-                    'api_version': config.get('AZURE_OPENAI_API_VERSION'),
-                    'deployment': config.get('AZURE_OPENAI_DEPLOYMENT'),
-                    'emb_deployment': config.get('AZURE_OPENAI_EMBEDDING_DEPLOYMENT')
-                }
-            
-            if 'azure-ai-search' in config:
-                vector_store_config = config['azure-ai-search']
-            else:
-                vector_store_config = {
-                    'azure_endpoint': config.get('AZURE_AI_SEARCH_ENDPOINT'),
-                    'api_key': config.get('AZURE_AI_SEARCH_KEY'),
-                    'index_name': config.get('AZURE_AI_SEARCH_INDEX_NAME')
-                }
-        else:
-            # 从.env或JSON加载的配置结构
-            model_name = 'gpt-4o-mini'
-            model_config = config.get(model_name, {})
-            vector_store_config = config.get('azure-ai-search', {})
-        
-        # 验证必需的配置
-        if not model_config or not model_config.get('api_key'):
-            print("❌ 错误: 未找到有效的 Azure OpenAI 配置")
-            print("请确保以下任一配置方式:")
-            print("  1. 在 .env 文件中设置 AZURE_OPENAI_API_KEY 等变量")
-            print("  2. 在 data/keys/azure_config.json 中配置")
-            print("  3. 使用 Streamlit secrets (仅限Web应用)")
-            return None, None, None
-        
-        # 处理endpoint
-        api_base = model_config.get('api_base', '')
-        base_endpoint = api_base.split('/openai')[0] if '/openai' in api_base else api_base
-        if not base_endpoint.endswith('/'):
-            base_endpoint += '/'
-        
-        print(f"✅ 使用模型: {model_config.get('deployment')}")
-        print(f"✅ 使用嵌入模型: {model_config.get('emb_deployment')}")
-        
-        # 根据嵌入模型确定维度
-        emb_deployment = model_config.get('emb_deployment', '')
-        if 'text-embedding-3-large' in emb_deployment:
-            dim = 3072
-        elif 'text-embedding-3-small' in emb_deployment:
-            dim = 1536
-        elif 'text-embedding-ada-002' in emb_deployment:
-            dim = 1536
-        else:
-            # 默认使用 1536（最常见的维度）
-            dim = 1536
-            print(f"⚠️ 未识别的嵌入模型 '{emb_deployment}'，使用默认维度 {dim}")
-        
-        print(f"ℹ️  嵌入向量维度: {dim}")
-        
-        # 初始化LLM
-        llm = AzureChatOpenAI(
-            api_key=model_config.get('api_key'),
-            azure_endpoint=base_endpoint,
-            azure_deployment=model_config.get('deployment'),
-            api_version=model_config.get('api_version'),
-            temperature=0
-        )
-        
-        # 初始化嵌入模型
-        emb_api_version = model_config.get('emb_api_version', model_config.get('api_version'))
-        embedding_model = AzureOpenAIEmbeddings(
-            api_key=model_config.get('api_key'),
-            azure_endpoint=base_endpoint,
-            azure_deployment=model_config.get('emb_deployment'),
-            api_version=emb_api_version,
-            dimensions=dim
-        )
-        
-        # 初始化向量存储（可选）
-        vector_store = None
-        if vector_store_config and vector_store_config.get('api_key'):
-            try:
-                vector_store = AzureSearch(
-                    azure_search_endpoint=vector_store_config.get('azure_endpoint'),
-                    azure_search_key=vector_store_config.get('api_key'),
-                    index_name=vector_store_config.get('index_name'),
-                    embedding_function=embedding_model
-                )
-                print("✅ Azure AI Search 已配置")
-            except Exception as e:
-                print(f"⚠️ Azure AI Search 配置失败: {e}")
-                vector_store = None
-        else:
-            print("ℹ️  未配置 Azure AI Search (可选功能)")
-        
-        return llm, embedding_model, vector_store
-        
-    except Exception as e:
-        print(f"❌ 初始化 OpenAI 客户端时出错: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None, None, None
-
-
-def get_embedding(text: str, model) -> np.ndarray:
-    """
-    Get embedding for a text using OpenAI model. Falls back to TF-IDF if model is unavailable.
-    
-    Args:
-        text: Text to embed
-        model: OpenAI embedding model
-    
-    Returns:
-        np.ndarray: Embedding vector
-    """
-    # Try to use OpenAI embedding model first
-    if model is not None:
-        try:
-            embedding = model.embed_query(text)
-            return embedding
-        except Exception as e:
-            print(f"Error using OpenAI embedding: {e}")
-            print("Falling back to TF-IDF embedding...")
-    
-    # Fallback to TF-IDF embedding
-    try:
-        # Create embedding using TF-IDF method
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        
-        # Using TF-IDF for more meaningful text representation
-        vectorizer = TfidfVectorizer(max_features=768)
-        
-        # Split text into sentences for document collection
-        sentences = [s.strip() for s in text.replace('\n', ' ').split('.') if s.strip()]
-        if len(sentences) < 2:
-            sentences = text.split()  # If no sentences, use words
-        
-        # Ensure sufficient text for vectorization
-        if len(sentences) < 2:
-            sentences = [text, "placeholder"]
-            
-        # Vectorize
-        tfidf_matrix = vectorizer.fit_transform(sentences)
-        # Use mean as final representation
-        embedding = tfidf_matrix.mean(axis=0).A[0]
-        
-        # Pad to required dimension (1536)
-        if len(embedding) < 1536:
-            embedding = np.pad(embedding, (0, 1536-len(embedding)), 'constant')
-        
-        # Truncate if dimension exceeds 1536
-        if len(embedding) > 1536:
-            embedding = embedding[:1536]
-            
-        return embedding
-    except Exception as e:
-        print(f"Error creating TF-IDF embedding: {e}")
-        # Return random embedding as last resort
-        return np.random.rand(1536)
-
-
-def compute_similarity(emb1, emb2) -> float:
-    """
-    Compute cosine similarity between two embeddings.
-    
-    Args:
-        emb1: First embedding
-        emb2: Second embedding
-    
-    Returns:
-        float: Cosine similarity score
-    """
-    emb1 = np.array(emb1).reshape(1, -1)
-    emb2 = np.array(emb2).reshape(1, -1)
-    return cosine_similarity(emb1, emb2)[0][0]
-
-
 def resolve_innovation_duplicates(
     df_relationships: pd.DataFrame, 
-    model=None, 
-    vector_store = None,
+    model=None,
     cache_config: Dict = None,
     method: str = "hdbscan",
     **method_kwargs) -> Dict[str, str]:
@@ -582,7 +203,6 @@ def resolve_innovation_duplicates(
     Args:
         df_relationships (pd.DataFrame): A relationship dataset containing Innovation nodes.
         model (callable, optional): Embedding model function that converts text -> vector.
-        vector_store (callable, optional): Azure AI search function, containing text emb. feat.
         cache_config (Dict, optional): 缓存配置，包含以下字段:
             - type: 缓存类型 ('embedding')
             - backend: 后端类型 ('json' or 'memory')
@@ -610,241 +230,39 @@ def resolve_innovation_duplicates(
     """
     print("Resolving innovation duplicates...")
     
-    default_cache_config = {
-        "type": "embedding",
-        "backend": "json", 
-        "path": "./embedding_vectors.json",
-        "use_cache": True
-    }
+    # Step 1: 提取唯一的创新
+    unique_innovations = InnovationExtractor.extract_unique_innovations(df_relationships)
     
-    # 合并配置
-    if cache_config is None:
-        cache_config = {}
-    
-    config = {**default_cache_config, **cache_config}
-
-    # Step 1: 从 DataFrame 中筛选出所有 source_type == "Innovation"，并去重
-    innovations = df_relationships[df_relationships["source_type"] == "Innovation"]
-    unique_innovations = innovations.drop_duplicates(subset=["source_id"]).reset_index(drop=True)
-    print(f"Found {len(unique_innovations)} unique innovations.")
-    if unique_innovations.empty:
+    if not InnovationExtractor.validate_innovations(unique_innovations):
         return {}
-
-    # Step 2: Construct a detailed textual context for each innovation
-    # This includes: name, description, developers, and relationship-based context
-    # Step 2: 为每个 Innovation 构建一个文本上下文（包含名称、描述、开发组织、其他关系说明）
-    innovation_features = {}
-
-
-    for _, row in tqdm(unique_innovations.iterrows(), total=len(unique_innovations), desc="Creating innovation features"):
-        innovation_id = row["source_id"]
-        if innovation_id in innovation_features:
-            continue
-
-        source_name = str(row.get("source_english_id", "")).strip()
-        source_desc = str(row.get("source_description", "")).strip()
-        context = f"Innovation name: {source_name}. Description: {source_desc}."
-
-        # 如果有 DEVELOPED_BY 关系，则拼接开发组织
-        dev_by = (
-            df_relationships[
-                (df_relationships["source_id"] == innovation_id) &
-                (df_relationships["relationship_type"] == "DEVELOPED_BY")
-            ]["target_english_id"]
-            .dropna()
-            .unique()
-            .tolist()
-        )
-        if dev_by:
-            context += " Developed by: " + ", ".join(dev_by) + "."
-
-        # 将其他关系（relationship description + target 英文名 + target 描述）拼接进 context
-        related_rows = df_relationships[df_relationships["source_id"] == innovation_id]
-        for _, rel_row in related_rows.iterrows():
-            rel_desc = str(rel_row.get("relationship description", "")).strip()
-            target_name = str(rel_row.get("target_english_id", "")).strip()
-            target_desc = str(rel_row.get("target_description", "")).strip()
-            if rel_desc and target_name and target_desc:
-                context += f" {rel_desc} {target_name}, which is described as: {target_desc}."
-
-        innovation_features[innovation_id] = context
-
-    # Step 3: 生成或加载这些上下文的 embeddings
-    print("Generating features for similarity comparison...")
-    # 假设 CacheFactory.create_cache 可以根据 config 创建出缓存实例，支持 load()/get_missing_keys()/update() 等接口
-    cache = CacheFactory.create_cache(
-        cache_type=config["type"],
-        backend_type=config["backend"],
-        cache_path=config["path"],
-        use_cache=config["use_cache"]
+    
+    # Step 2: 构建创新特征
+    innovation_features = InnovationFeatureBuilder.build_all_features(
+        unique_innovations, df_relationships
     )
-
-    # 从缓存里 load 出已经存在的 embedding
-    embeddings: Dict[str, np.ndarray] = cache.load()  # { innovation_id: np.array(...) }
-    all_ids = list(innovation_features.keys())
-    missing_ids = cache.get_missing_keys(all_ids)
-
-    if missing_ids:
-        print(f"Generating {len(missing_ids)} new embeddings...")
-        new_embd: Dict[str, np.ndarray] = {}
-        for iid in tqdm(missing_ids, desc="Embedding innovations"):
-            txt = innovation_features[iid]
-            new_embd[iid] = get_embedding(txt, model)
-        cache.update(new_embd)
-        embeddings.update(new_embd)
-
-    # 确保 embeddings 的顺序和 unique_innovations 一致
-    embedding_items = [(iid, embeddings[iid]) for iid in all_ids]
-    innovation_ids = [item[0] for item in embedding_items]
-    embedding_matrix = np.vstack([item[1] for item in embedding_items])  # shape = (N, D)
-
-    # Step 4: 根据用户指定的 method，调用对应的聚类算法
-    print(f"Clustering similar innovations with method='{method}'...")
-    canonical_mapping: Dict[str, str] = {}
-
-    method_lower = method.lower()
-    if method_lower in {"hdbscan", "kmeans", "agglomerative", "spectral"}:
-        # -------- 1) 平面簇算法 - 使用统一接口 --------
-        labels, stats = cluster_with_stats(
-            embedding_matrix=embedding_matrix,
-            method=method_lower,
-            **method_kwargs
-        )
-        
-        # 打印聚类统计信息
-        print(f"✅ 聚类完成 [{stats['method'].upper()}]:")
-        print(f"   📊 簇数量: {stats['n_clusters']}")
-        print(f"   ⚠️  噪音点: {stats['n_noise']} ({stats['n_noise']/stats['total_samples']*100:.1f}%)")
-        print(f"   📈 最大簇: {stats['largest_cluster']} 样本")
-        print(f"   📉 最小簇: {stats['smallest_cluster']} 样本")
-        print(f"   🔢 总样本: {stats['total_samples']}")
-
-        # 把 label -> cluster 成员映射出来
-        clusters: Dict[int, List[str]] = {}
-        for idx, lab in enumerate(labels):
-            if lab == -1:
-                # HDBSCAN 的 -1 (噪声) 单独成一簇
-                key = f"noise_{innovation_ids[idx]}"
-                clusters.setdefault(key, []).append(innovation_ids[idx])
-            else:
-                clusters.setdefault(int(lab), []).append(innovation_ids[idx])
-
-        # 把每个簇里的第一个成员设为 canonical_id
-        for lab_key, members in clusters.items():
-            canonical_id = members[0]
-            for mid in members:
-                canonical_mapping[mid] = canonical_id
-
-    elif method_lower in {"graph_threshold", "graph_kcore"}:
-        # -------- 2) 图聚类算法 --------
-        sim_threshold = method_kwargs.get("similarity_threshold", 0.85)
-        use_cos = method_kwargs.get("use_cosine", True)
-
-        if method_lower == "graph_threshold":
-            clusters_dict = graph_threshold_clustering(
-                embedding_matrix=embedding_matrix,
-                ids=innovation_ids,
-                similarity_threshold=sim_threshold,
-                use_cosine=use_cos
-            )
-        else:  # "graph_kcore"
-            k_core = method_kwargs.get("k_core", 15)
-            clusters_dict = graph_kcore_clustering(
-                embedding_matrix=embedding_matrix,
-                ids=innovation_ids,
-                similarity_threshold=sim_threshold,
-                k_core=k_core,
-                use_cosine=use_cos
-            )
-
-        # clusters_dict 已经是 { canonical_id: [member_id,...], ... }
-        for canonical_id, members in clusters_dict.items():
-            for mid in members:
-                canonical_mapping[mid] = canonical_id
-
-    else:
-        raise ValueError(
-            f"Unknown clustering method '{method}'.\n"
-            "请选择：['hdbscan','kmeans','agglomerative','spectral','graph_threshold','graph_kcore']。"
-        )
-
+    
+    # Step 3: 生成或加载嵌入向量
+    embedding_manager = EmbeddingManager.create_from_config(
+        cache_config=cache_config,
+        embedding_function=get_embedding
+    )
+    
+    innovation_ids, embedding_matrix = embedding_manager.get_embeddings(
+        innovation_features, model
+    )
+    
+    # Step 4: 使用策略模式执行聚类
+    clustering_strategy = ClusteringStrategyFactory.create_strategy(method)
+    canonical_mapping = clustering_strategy.cluster(
+        embedding_matrix=embedding_matrix,
+        innovation_ids=innovation_ids,
+        **method_kwargs
+    )
+    
+    # 打印结果摘要
     print(f"Found {len(set(canonical_mapping.values()))} unique innovation clusters "
           f"(reduced from {len(unique_innovations)}).")
-          
-    # Step 5: (deleted)
     
-    # Step 6: Upload canonical embeddings to Azure AI Search
-    if vector_store is not None:
-
-        uploaded_id_path = "./uploaded_ids.json"
-        if os.path.exists(uploaded_id_path):
-            with open(uploaded_id_path, "r") as f:
-                uploaded_ids = set(json.load(f))
-        else:
-            uploaded_ids = set()
-        
-        to_be_upload_ids = set()
-        new_uploaded_ids = set()
-
-        text_embeddings = []
-        contents = []
-        # print(clusters.values())
-
-        for id, emb in embeddings.items():
-            if id in innovation_features and id not in uploaded_ids \
-                    and id not in to_be_upload_ids:
-                text_embeddings.append((id, emb))
-                contents.append(innovation_features[id])
-                to_be_upload_ids.add(id)
-            else:
-                print(f"[警告] {id} 被跳过")
-
-        # 1000 时有 error_map 的bug
-        batch_size = 500
-        total_batches = math.ceil(len(text_embeddings) / batch_size)
-        print(f"将上传 {len(text_embeddings)} 条嵌入向量，总共 {total_batches} 批")
-
-
-        # 将 id 对应的 description 装入 metadata，不需要再使用 global innovation_features
-        for i in range(total_batches):
-            start_index = i * batch_size
-            end_index = start_index + batch_size
-
-            batch_text_embeddings = text_embeddings[start_index:end_index]
-            batch_contents = contents[start_index:end_index]
-            metadatas = [{'source': content} for content in batch_contents]
-
-            try:
-                vector_store.add_embeddings(
-                    text_embeddings=batch_text_embeddings,
-                    metadatas=metadatas
-                )
-
-                for id,_ in batch_text_embeddings:
-                    new_uploaded_ids.add(id)
-
-                print(f"Successfully uploaded batch {i + 1}/{total_batches}")
-            # Batch 失败就一个一个试
-            except Exception as e:
-                try:
-                    print(f"Error batch")
-                    for embd in batch_text_embeddings:
-                        vector_store.add_embeddings(
-                            text_embeddings=[embd],
-                            metadatas=[{'source':innovation_features[embd[0]]}]
-                        )
-                        new_uploaded_ids.add(embd[0])
-
-                except Exception as e:
-                    print(f"Error uploading embedding: {e}")
-
-        # 所有上传结束后，更新本地记录
-        uploaded_ids.update(new_uploaded_ids)
-        with open(uploaded_id_path, "w") as f:
-            json.dump(sorted(list(uploaded_ids)), f, indent=2)
-
-        print("Uploaded embeddings to Azure AI Search...")
-        
     return canonical_mapping
 
 
@@ -1112,48 +530,6 @@ def export_results(analysis_results: Dict, consolidated_graph: Dict, canonical_m
     print(f"Results exported to {output_dir}")
 
 
-def chat_bot(query:str) -> str:
-
-    llm, embedding_model, vector_store = initialize_openai_client()
-
-    
-    if llm is None:
-        return "Error: Language model not available. Please check your configuration."
-    
-    if vector_store is None:
-        return "Error: AI search unavailable. Please check your configuration."
-    
-
-    # Set up Chatbot
-    chatbot_prompt = PromptTemplate.from_template("""
-
-        You're a smart assistant helping extract insights from VTT innovation relationships.
-
-        Context:
-        {context}
-
-        According to the context, answer this question:
-        {question}
-    """)
-
-    chatbot_llm = chatbot_prompt | llm
-
-    try:
-        results = vector_store.vector_search(query, k=3)
-        context = "\n".join([res.metadata['source'] for res in results])
-    except Exception as e:
-        print(f"Error during vector search: {str(e)}")
-        context = "No relevant information found."
-
-    try:
-        llm_result = chatbot_llm.invoke({"context":context, "question":query})
-        answer = llm_result.content
-    except Exception as e:
-        print(f"Error generating answer: {str(e)}")
-        answer = f"Sorry, I couldn't process your question. Error: {str(e)}"
-    
-    return answer
-
 def main():
     """Main function to execute the innovation resolution workflow."""
     import argparse
@@ -1191,9 +567,7 @@ def main():
     df_relationships, all_pred_entities, all_pred_relations = load_and_combine_data()
     
     # Step 2: Initialize OpenAI client
-
-    llm, embed_model, vector_store = initialize_openai_client()
-
+    llm, embed_model = initialize_openai_client()
     
     if llm is None:
         print("Warning: Language model not available. Some features may be limited.")
@@ -1201,19 +575,6 @@ def main():
     if embed_model is None:
         print("Warning: Embedding model not available. Using TF-IDF embeddings as fallback.")
 
-    if vector_store is None:
-        print("Warning: AI search unavailable.")
-
-    # Step 3: Resolve innovation duplicates
-    canonical_mapping = resolve_innovation_duplicates(
-        df_relationships, 
-        embed_model,
-        vector_store,
-        cache_config=cache_config
-    )
-
-
-    
     # Step 3: Resolve innovation duplicates
     canonical_mapping = resolve_innovation_duplicates(
         df_relationships=df_relationships,

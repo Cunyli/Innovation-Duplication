@@ -18,7 +18,9 @@ This project addresses the challenge of identifying and consolidating innovation
 |----------|-------------|
 | **[Getting Started](docs/GETTING_STARTED.md)** | Setup, configuration & troubleshooting |
 | **[Development](docs/DEVELOPMENT.md)** | Project structure & development guide |
-| **[Clustering](docs/CLUSTERING.md)** | Clustering algorithms & API reference |
+| **[Clustering Guide](docs/CLUSTERING_GUIDE.md)** | Clustering methods & usage guide |
+| **[Technical Details](docs/TECHNICAL_DETAILS.md)** | Deep dive into implementation |
+| **[Data Pipeline Refactoring](docs/DATA_PIPELINE_REFACTORING_GUIDE.md)** | Architecture & design patterns |
 | **[Documentation Index](docs/README.md)** | Full documentation overview |
 
 ## Challenge Description
