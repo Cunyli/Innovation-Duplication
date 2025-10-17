@@ -230,11 +230,20 @@ def visualize_network_tufte_3D(analysis_results: dict):
         legend=dict(title_text='Relation Types', x=0, y=1, bgcolor='rgba(255,255,255,0.5)')
     )
 
-    # 6. 保存交互 HTML 和静态图
+    # 6. 保存交互式 HTML（比 PNG 更好用：支持旋转、缩放、悬停查看详情）
     fig.write_html(os.path.join(RESULTS_DIR, 'innovation_network_tufte_3D.html'))
-    fig.write_image(os.path.join(RESULTS_DIR, 'innovation_network_tufte_3D.png'),
-                    width=1200, height=900)
-    print("3D network visualization saved: innovation_network_tufte_3D.html & .png")
+    print("✅ 3D network visualization saved: innovation_network_tufte_3D.html")
+    print("   提示：在浏览器中打开可进行交互操作（旋转、缩放、悬停查看详情）")
+    
+    # PNG 生成已禁用（原因：ARM 架构容器不支持 Kaleido/Chrome）
+    # 注：HTML 文件提供了更好的交互体验，无需 PNG
+    # 如需 PNG，可在支持的环境中取消下方注释：
+    # try:
+    #     fig.write_image(os.path.join(RESULTS_DIR, 'innovation_network_tufte_3D.png'),
+    #                     width=1200, height=900)
+    #     print("✅ 3D network PNG image saved: innovation_network_tufte_3D.png")
+    # except Exception as e:
+    #     print(f"⚠️  PNG generation skipped: {e.__class__.__name__}")
 
 def visualize_network_tufte_bar(analysis_results: dict):
     stats = analysis_results['stats']
