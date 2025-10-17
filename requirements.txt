@@ -19,12 +19,20 @@ kaleido
 scikit-learn
 hdbscan
 
-# OpenAI API integration
+# LangChain and OpenAI API integration
+langchain
+langchain-core
+langchain-community
+langchain-openai
+langchain-experimental
+openai
 azure-search-documents
 azure-identity
-langchain_community
-langchain-openai
-openai
+
+# Configuration and utilities
+toml
+python-dotenv
+Pillow
 
 # Development tools
 jupyter

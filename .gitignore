@@ -1,12 +1,45 @@
+# Data and sensitive files
 data/
 keys/
 logs/
 # results/
 venvs/
 .streamlit/
-__pycache__/
-.DS_Store
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Embedding cache files
+embedding_vectors.json
+*_cache.json
+*.cache.json
+
+# System files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# File types
 *.json
 # *.png
 # *.html
@@ -14,5 +47,6 @@ __pycache__/
 *.tar.bz2
 *.csv
 
+# Template exceptions
 !evaluation/*_template.json
 !evaluation/*_template.csv

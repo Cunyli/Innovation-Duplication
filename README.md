@@ -1,10 +1,24 @@
 # VTT Innovation Resolution
 
-Youtube Link: https://www.youtube.com/watch?v=yKNr22bu9Yc
-
-Streamlit app link: https://innovation-duplication.streamlit.app
+[![YouTube](https://img.shields.io/badge/YouTube-Demo-red)](https://www.youtube.com/watch?v=yKNr22bu9Yc)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B)](https://innovation-duplication.streamlit.app)
 
 This project addresses the challenge of identifying and consolidating innovation disclosures from VTT's collaboration partnerships.
+
+## 🚀 Quick Start
+
+**New to this project?** Start here:
+
+1. **[Getting Started Guide](docs/GETTING_STARTED.md)** - Complete setup in 5 minutes
+2. **[Development Guide](docs/DEVELOPMENT.md)** - Understand the codebase
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[Getting Started](docs/GETTING_STARTED.md)** | Setup, configuration & troubleshooting |
+| **[Development](docs/DEVELOPMENT.md)** | Project structure & development guide |
+| **[Documentation Index](docs/README.md)** | Full documentation overview |
 
 ## Challenge Description
 
@@ -24,164 +38,155 @@ The data has been preprocessed into structured graph documents containing:
 - Nodes (Organizations and Innovations)
 - Relationships (DEVELOPED_BY and COLLABORATION)
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 Innovation-Duplication/
-├── data/
+├── config/                     # ⭐ Configuration management
+│   ├── config_loader.py        # Unified config loader (.env + JSON)
+│   └── generate_config_from_toml.py
+├── tests/                      # ⭐ Test suite
+│   ├── test_azure_connection.py
+│   └── test_cluster.py
+├── docs/                       # ⭐ Documentation
+│   ├── QUICKSTART.md
+│   ├── CONFIGURATION.md
+│   ├── PROJECT_STRUCTURE.md
+│   └── MIGRATION_GUIDE.md
+├── data/                       # Data files (git-ignored)
 │   ├── dataframes/             # Source dataframes
-│   ├── entity_glossary/        # Organization name resolution data
-│   ├── graph_docs/             # Original extracted relationship data
-│   ├── graph_docs_names_resolved/  # Data with resolved organization names
-│   ├── graph_docs_vtt_domain/  # VTT domain source data
-│   ├── graph_docs_vtt_domain_names_resolved/  # VTT domain data with resolved names
-│   └── keys/                   # API keys for OpenAI (needs to be obtained)
-├── evaluation/                 # Evaluation files directory
-│   ├── gold_entities.json      # Gold standard entities for evaluation (optional)
-│   ├── gold_relations.json     # Gold standard relations for evaluation (optional)
-│   ├── pred_entities.json      # Predicted entities
-│   ├── pred_relations.json     # Predicted relations
-│   ├── consistency_sample.csv  # Samples for manual consistency checking
-│   ├── qa_examples.json        # Example QA queries and results
-│   └── evaluation_results.json # Comprehensive evaluation metrics
-├── results/                    # Output directory for analysis results
-├── introduction_data.ipynb     # Notebook introducing the dataset
-├── introduction_data.py        # Python script version of the introduction
-├── local_entity_processing.py  # Data models for graph documents
-├── innovation_resolution.py    # Main script for innovation resolution
-├── innovation_utils.py         # Utility functions for innovation resolution
-├── evaluation.py               # Evaluation module for quality assessment
-├── requirements.txt            # Project dependencies (pip)
-├── environment.yml             # Conda environment specification
+│   ├── entity_glossary/        # Organization name resolution
+│   ├── graph_docs/             # Extracted relationship data
+│   └── keys/                   # API configuration files
+├── evaluation/                 # Evaluation files
+├── results/                    # Output results
+├── utils/                      # Utility modules
+│   └── cluster/                # Clustering algorithms
+├── .env                        # ⭐ Environment configuration (git-ignored)
+├── .env.template               # Configuration template
+├── app.py                      # 🚀 Streamlit web application
+├── innovation_resolution.py    # 🚀 Main analysis script
+├── evaluation.py               # Evaluation module
+├── requirements.txt            # Python dependencies
 └── README.md                   # This file
 ```
 
-## Setup
+**💡 See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for detailed structure documentation.**
 
-### Using pip
+## ⚙️ Setup
 
-1. Clone this repository
-2. Install dependencies:
+### Quick Setup (Recommended)
+
+1. **Copy configuration template:**
+   ```bash
+   cp .env.template .env
    ```
+
+2. **Edit `.env` with your API keys:**
+   ```bash
+   AZURE_OPENAI_API_KEY=your-key-here
+   AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+   AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+   AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+   ```
+
+3. **Install dependencies:**
+   ```bash
    pip install -r requirements.txt
    ```
 
-
-### Configuration file
-
-1. Obtain API keys for OpenAI models by asking at the VTT stand
-2. Place your API key configuration in `data/keys/azure_config.json` with the following structure:
-   ```json
-   {
-   "azure-ai-search": {
-      "api_key": "YOUR_SEARCH_KEY",
-      "azure_endpoint": "https://your-search.search.windows.net",
-      "index_name": "innovation-index"
-   },
-     "gpt-4o-mini": {
-       "api_key": "YOUR_API_KEY",
-       "api_base": "YOUR_AZURE_ENDPOINT",
-       "api_version": "API_VERSION",
-       "deployment": "gpt-4o-mini",
-       "eval_deployment": "gpt-4o-mini",
-       "emb_deployment": "text-embedding-3-large"
-     },
-     "gpt-4.1-mini": {
-       "api_key": "YOUR_API_KEY",
-       "api_base": "YOUR_AZURE_ENDPOINT",
-       "api_version": "API_VERSION",
-       "deployment": "gpt-4.1-mini",
-       "eval_deployment": "gpt-4.1-mini",
-       "emb_deployment": "text-embedding-3-large"
-     },
-     "gpt-4.1": {
-       "api_key": "YOUR_API_KEY",
-       "api_base": "YOUR_AZURE_ENDPOINT", 
-       "api_version": "API_VERSION",
-       "deployment": "gpt-4.1",
-       "eval_deployment": "gpt-4.1",
-       "emb_deployment": "text-embedding-3-large"
-     }
-   }
+4. **Test configuration:**
+   ```bash
+   python tests/test_azure_connection.py
    ```
 
-## Usage
+**📖 Detailed setup instructions: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)**
 
-1. Run the introduction notebook to understand the data:
-   ```
+### Legacy Configuration (Optional)
+
+You can also use `data/keys/azure_config.json`:
+```json
+{
+  "gpt-4o-mini": {
+    "api_key": "YOUR_API_KEY",
+    "api_base": "YOUR_AZURE_ENDPOINT",
+    "api_version": "API_VERSION",
+    "deployment": "gpt-4o-mini",
+    "emb_deployment": "text-embedding-3-small"
+  }
+}
+```
+
+## 🚀 Usage
+
+### Basic Usage
+
+1. **Explore the data:**
+   ```bash
    jupyter notebook introduction_data.ipynb
    ```
 
-2. Execute the innovation resolution solution:
-   ```
+2. **Run innovation resolution:**
+   ```bash
    python innovation_resolution.py
    ```
 
-3. Start Streamlit app locally:
-   ```
+3. **Launch web interface:**
+   ```bash
    streamlit run app.py
    ```
 
-The script will perform the following steps:
-1. Load and combine data from both company websites and VTT domain
-2. Initialize OpenAI client for generating embeddings
-3. Resolve innovation duplicates using semantic similarity
-4. Create a consolidated knowledge graph
-5. Analyze the innovation network
-6. Visualize the results
-7. Export the results to the `results/` directory
-8. Run evaluation metrics on the results
-
 ### Command Line Options
 
-The script supports various command line options for configuring the caching system and evaluation:
-
-```
+```bash
 python innovation_resolution.py [options]
 
 Options:
-  --cache-type TYPE      Cache type to use (default: embedding)
-  --cache-backend TYPE   Cache backend type (json or memory, default: json)
-  --cache-path PATH      Path to cache file (default: ./embedding_vectors.json)
+  --cache-type TYPE      Cache type (default: embedding)
+  --cache-backend TYPE   Cache backend (json or memory, default: json)
+  --cache-path PATH      Cache file path (default: ./embedding_vectors.json)
   --no-cache             Disable caching
   --skip-eval            Skip evaluation step
-  --auto-label           Automatically label consistency samples and generate gold standard files
+  --auto-label           Auto-label for evaluation
 ```
 
-Examples:
+**Examples:**
 ```bash
-# Use default configuration (JSON file caching)
+# Standard run
 python innovation_resolution.py
 
-# Use in-memory caching (faster but not persistent)
-python innovation_resolution.py --cache-backend memory
-
-# Disable caching (regenerate embeddings each time)
-python innovation_resolution.py --no-cache
-
-# Custom cache file location
-python innovation_resolution.py --cache-path "./data/cache/embeddings.json"
-
-# Skip evaluation metrics
+# Fast run (skip evaluation)
 python innovation_resolution.py --skip-eval
 
-# Use automatic labeling for evaluation (no manual labeling required)
-python innovation_resolution.py --auto-label
+# Custom cache location
+python innovation_resolution.py --cache-path "./data/cache/embeddings.json"
+
+# No caching (regenerate all)
+python innovation_resolution.py --no-cache
 ```
 
-## Solution Details
+## 🔧 What the Script Does
 
-# Azure Integration Details
+1. ✅ Load and combine data from multiple sources
+2. ✅ Generate embeddings using Azure OpenAI
+3. ✅ Detect duplicate innovations using semantic similarity
+4. ✅ Create consolidated knowledge graph
+5. ✅ Analyze innovation network
+6. ✅ Generate visualizations
+7. ✅ Export results to `results/` directory
+8. ✅ Run evaluation metrics
 
-This section provides detailed instructions and configurations for integrating with Azure services.
+## 🧪 Testing
 
----
+```bash
+# Test Azure API connection
+python tests/test_azure_connection.py
 
-## Azure Services Used
+# Test clustering algorithms
+python tests/test_cluster.py
+```
 
-### 1. Azure OpenAI
-
-Used for:
+## 🏗️ Solution Architecture
 
 * Embedding generation via `AzureOpenAIEmbeddings`
 * Language understanding and chat responses via `AzureChatOpenAI`
@@ -400,41 +405,55 @@ To use the evaluation module, you can:
    - Complete evaluation results are saved to `evaluation/evaluation_results.json`
    - QA examples are saved to `evaluation/qa_examples.json`
 
-## Results
+## 📊 Results
 
-The solution produces the following outputs:
+The solution produces outputs in the `results/` directory:
 
-1. In the `results/` directory:
-   - `canonical_mapping.json`: Mapping from original innovation IDs to canonical IDs
-   - `consolidated_graph.json`: Complete consolidated knowledge graph
-   - `innovation_stats.json`: Statistics about the innovation network
-   - `multi_source_innovations.json`: Details about innovations mentioned in multiple sources
-   - `key_nodes.json`: Key organizations and innovations based on network analysis
-   - Visualizations:
-     - `innovation_network.png`: Network visualization
-     - `innovation_network_3d.html`: Interactive 3D network visualization
-     - `innovation_stats.png`: Summary statistics visualization
-     - `top_organizations.png`: Top organizations by innovation count
+### Data Files
+- `canonical_mapping.json` - Innovation ID mappings
+- `consolidated_graph.json` - Complete knowledge graph
+- `innovation_stats.json` - Network statistics
+- `multi_source_innovations.json` - Cross-source innovations
+- `key_nodes.json` - Key organizations and innovations
 
-2. In the `evaluation/` directory:
-   - `consistency_sample.csv`: Samples for manual consistency checking
-   - `evaluation_results.json`: Comprehensive evaluation metrics
-   - `qa_examples.json`: Example QA queries and results
-   - `pred_entities.json`: Predicted entities
-   - `pred_relations.json`: Predicted relations
+### Visualizations
+- `innovation_network.png` - Network visualization
+- `innovation_network_3d.html` - Interactive 3D network
+- `innovation_stats.png` - Statistics charts
+- `top_organizations.png` - Top organizations
 
-## Dependencies
+### Evaluation (in `evaluation/` directory)
+- `consistency_sample.csv` - Manual checking samples
+- `evaluation_results.json` - Evaluation metrics
+- `qa_examples.json` - QA examples
+- `pred_entities.json` - Predicted entities
+- `pred_relations.json` - Predicted relations
 
-Main dependencies include:
-- pandas, numpy: Data processing
-- pydantic: Data modeling
-- langchain-openai, openai: API integration with OpenAI models
-- networkx, matplotlib, seaborn, plotly: Visualization and network analysis
-- scikit-learn: Machine learning utilities for TF-IDF fallback
+## 🔗 Additional Resources
 
-See `requirements.txt` for the complete list.
+- **[Full Documentation](docs/README.md)** - Complete documentation index
+- **[YouTube Demo](https://www.youtube.com/watch?v=yKNr22bu9Yc)** - Video walkthrough
+- **[Live App](https://innovation-duplication.streamlit.app)** - Try it online
 
-## Contributors
+## 🛠️ Technology Stack
+
+- **Data Processing:** pandas, numpy, pydantic
+- **AI/ML:** Azure OpenAI, LangChain, scikit-learn
+- **Visualization:** matplotlib, seaborn, plotly, networkx
+- **Web Interface:** Streamlit
+- **Clustering:** HDBSCAN
+
+See [`requirements.txt`](requirements.txt) for complete dependencies.
+
+## 👥 Contributors
 
 This project is part of the AaltoAI Hackathon in collaboration with VTT.
+
+## 📄 License
+
+[Add license information]
+
+---
+
+**📚 [Documentation](docs/README.md)** | **🚀 [Getting Started](docs/GETTING_STARTED.md)** | **🛠️ [Development Guide](docs/DEVELOPMENT.md)**
 
