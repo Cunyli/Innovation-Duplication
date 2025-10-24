@@ -1,5 +1,7 @@
 # 技术细节文档
 
+> 高层结构和包概览请先阅读 **DEVELOPMENT.md**。本文件保留深入实现细节和公式。
+
 本文档详细说明创新去重系统的核心技术实现。
 
 ## 🎯 核心功能：`resolve_innovation_duplicates`

@@ -1,5 +1,7 @@
 # 数据管道模块化重构完整指南
 
+> 核心架构要点已整合进 **DEVELOPMENT.md**。保留本文档，作为历史记录和深入背景说明。
+
 本文档记录了 `innovation_resolution.py` 中数据管道部分的完整重构过程。
 
 ---
@@ -81,7 +83,7 @@ data/
 
 **使用示例**：
 ```python
-from data.loaders import GraphDocumentLoader
+from innovation_platform.data_pipeline.loaders import GraphDocumentLoader
 
 loader = GraphDocumentLoader()
 graph_doc = loader.load("path/to/file.pkl")
@@ -102,7 +104,7 @@ if graph_doc:
 
 **使用示例**：
 ```python
-from data.loaders import NodeMapper
+from innovation_platform.data_pipeline.loaders import NodeMapper
 
 mapper = NodeMapper()
 node_description, node_en_id = mapper.extract_mappings(graph_doc)
@@ -123,7 +125,7 @@ eng_name = node_en_id.get(node_id, node_id)  # 回退到原始ID
 
 **使用示例**：
 ```python
-from data.processors import RelationshipProcessor
+from innovation_platform.data_pipeline.processors import RelationshipProcessor
 
 processor = RelationshipProcessor()
 
@@ -160,7 +162,7 @@ rows = processor.process_relationships(
 
 **使用示例**：
 ```python
-from data.processors import DataSourceProcessor
+from innovation_platform.data_pipeline.processors import DataSourceProcessor
 
 # 创建处理器
 processor = DataSourceProcessor(
@@ -256,7 +258,7 @@ def load_and_combine_data():
 
 ```python
 def load_and_combine_data():
-    from data.processors import DataSourceProcessor
+    from innovation_platform.data_pipeline.processors import DataSourceProcessor
     
     # 初始化
     all_pred_entities = []

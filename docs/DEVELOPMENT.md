@@ -1,123 +1,99 @@
 # Development Guide
 
-Developer guide for understanding and extending the Innovation-Duplication project.
+This guide explains how the project is organised, how the pipeline works, and what to touch when you extend it.
 
-## 📁 Project Structure
+## 📁 Repository Layout
 
 ```
 Innovation-Duplication/
-├── config/                     # Configuration management
-│   ├── __init__.py
-│   ├── config_loader.py        # Unified config loader
-│   ├── generate_config_from_toml.py
-│   └── README.md
-│
-├── tests/                      # Test suite
-│   ├── __init__.py
-│   ├── test_azure_connection.py
-│   ├── test_cluster.py
-│   └── README.md
-│
-├── docs/                       # Documentation
-│   ├── README.md               # This file
-│   ├── GETTING_STARTED.md      # Setup & configuration
-│   └── DEVELOPMENT.md          # Development guide
-│
-├── data/                       # Data files (git-ignored)
-│   ├── dataframes/             # Source data
-│   ├── entity_glossary/        # Name resolution
-│   ├── graph_docs/             # Extracted relationships
-│   └── keys/                   # API configs (git-ignored)
-│
-├── evaluation/                 # Evaluation files
-│   ├── *_template.json/csv     # Templates (tracked)
-│   └── *.json/csv              # Results (git-ignored)
-│
-├── results/                    # Output results
-│   ├── *.json                  # Data files
-│   ├── *.html                  # Interactive visualizations
-│   └── *.png                   # Static visualizations
-│
-├── utils/                      # Utility modules
-│   └── cluster/                # Clustering algorithms
-│
-├── scripts/                    # Utility scripts (future)
-│
-├── .env                        # Environment config (git-ignored)
-├── .env.template               # Config template
-├── app.py                      # Streamlit web app
-├── innovation_resolution.py    # Main analysis script
-├── innovation_utils.py         # Utility functions
-├── evaluation.py               # Evaluation module
-├── local_entity_processing.py  # Data models
-├── vis.py                      # Visualization utilities
-├── requirements.txt            # Python dependencies
-└── README.md                   # Project overview
+├── app.py                    # Streamlit front-end
+├── notebooks/                # Exploratory notebooks
+├── scripts/                  # Helper scripts (analytics, demos)
+├── src/
+│   └── innovation_platform/
+│       ├── __init__.py
+│       ├── config/           # Config loader + generators
+│       ├── core/             # Cache backends
+│       ├── data_pipeline/    # Loaders, processors, feature builders
+│       ├── utils/            # Shared helpers (clustering)
+│       ├── evaluation.py     # Evaluation orchestration
+│       ├── innovation_resolution.py
+│       ├── innovation_utils.py
+│       ├── local_entity_processing.py
+│       └── vis.py
+├── data/                     # Input assets (gitignored)
+│   ├── dataframes/
+│   ├── graph_docs_*/
+│   ├── entity_glossary/
+│   └── keys/
+├── results/                  # Generated artifacts (json/png/html)
+├── evaluation/               # Label templates & sampled outputs
+├── tests/                    # Unit & integration tests
+└── docs/                     # Documentation bundle
 ```
 
-## 🔧 Core Components
+### Key packages inside `src/innovation_platform`
 
-### Main Application Files
+| Module | Purpose | Highlights |
+|--------|---------|-----------|
+| `config` | Normalises config from `.env` or legacy JSON | `load_config`, `initialize_llm_from_env` |
+| `core` | Cache abstractions for embeddings | JSON + in-memory backends |
+| `data_pipeline.loaders` | Reads graph pickle files & node lookups | `GraphDocumentLoader`, `NodeMapper` |
+| `data_pipeline.processors` | Converts raw docs into structured relationships, builds features, runs clustering | `DataSourceProcessor`, `InnovationFeatureBuilder`, `ClusteringStrategyFactory` |
+| `utils.cluster` | Concrete clustering algorithms + graph-based helpers | `cluster_with_stats`, `graph_threshold_clustering` |
+| `vis` | Tufte-inspired plots + 3D network renderer | Saves into `results/` |
+| `evaluation` | Wraps consistency/entity/relation/QA checks | `run_all_evaluations` |
 
-#### `innovation_resolution.py`
-**Purpose:** Main analysis pipeline  
-**Usage:** `python innovation_resolution.py [options]`
+## 🔄 Pipeline Overview
 
-**What it does:**
-1. Loads innovation data from multiple sources
-2. Resolves duplicate innovations using embeddings
-3. Creates consolidated knowledge graph
-4. Generates visualizations
-5. Exports results
-6. Runs evaluation
+`innovation_platform.innovation_resolution` wires the end-to-end workflow:
 
-#### `app.py`
-**Purpose:** Streamlit web interface  
-**Usage:** `streamlit run app.py`
+1. **Load** CSVs and graph pickles (`load_and_combine_data`).
+2. **Feature** each innovation (concatenate descriptions, relationships, sources).
+3. **Embed** innovations and fetch cached vectors when possible (`EmbeddingManager`).
+4. **Cluster** duplicates (default HDBSCAN; graph or flat clustering supported).
+5. **Consolidate** a knowledge graph that merges nodes and relationships.
+6. **Analyse & Visualise** centralities, top organisations, and network snapshots (`vis.py`).
+7. **Export** JSON summaries/PNGs/HTML (`export_results`).
+8. **Evaluate** predictions against gold templates (`run_all_evaluations`) — optional.
 
-**Features:**
-- Interactive data exploration
-- Q&A chatbot (requires Azure AI Search)
-- Visualization tools
+Each step can be toggled via the CLI `--steps` argument or dedicated skip-flags. The defaults execute everything except the Streamlit front-end.
 
-#### `evaluation.py`
-**Purpose:** Quality assessment module
+## 📦 Data & Artifacts
 
-**Metrics:**
-- Entity and relation evaluation
-- Consistency checking
-- QA validation
+- **Inputs (`data/`)** — keep raw CSVs, processed graph pickles, and API keys.
+- **Intermediate cache** — embedding cache defaults to `embedding_vectors.json` in the repo root; override with `--cache-path`.
+- **Outputs (`results/`)** — canonical mapping, consolidated graph, PNG/HTML visualisations, stats.
+- **Evaluation (`evaluation/`)** — templates (`*_template.*`) remain in git; generated comparisons land alongside them.
 
-### Configuration Module (`config/`)
+Version large inputs externally (e.g. blob storage) and keep this repo focused on code + lightweight artefacts.
 
-#### `config_loader.py`
-Unified configuration loader supporting:
-- `.env` files (recommended)
-- `azure_config.json` (legacy)
-- Automatic fallback
+## 🧪 Testing & Quality
 
-**Usage:**
-```python
-from config import load_config, initialize_llm_from_env
+| Scope | Command | Notes |
+|-------|---------|-------|
+| Unit smoke tests | `PYTHONPATH=src pytest tests/unit` | No external dependencies |
+| Integration tests | `PYTHONPATH=src pytest tests/integration` | Touches data + Azure creds |
+| Azure connectivity | `python tests/integration/test_azure_connection.py` | Validates chat + embedding deployments |
 
-# Load config
-config = load_config()
+When adding modules, mirror the layout under `tests/unit` or `tests/integration` to keep coverage obvious.
 
-# Initialize LLM
-llm = initialize_llm_from_env('gpt-4o-mini')
-```
+## 🛠️ Development Tips
 
-#### `generate_config_from_toml.py`
-Converts `.streamlit/secrets.toml` to JSON format.
+- **Relative imports:** always import via `innovation_platform.<module>` to keep packaging clean.
+- **Pickle compatibility:** existing pickles expect the `local_entity_processing` module; the shim at repo root maps to the new package — do not remove it.
+- **Configuration defaults:** expose new settings through `.env` and surface them in `config_loader.py` first; reference them via `load_config()`.
+- **CLI additions:** document any new arguments in `CLI_USAGE_GUIDE.md` and provide a shorthand example.
+- **Visualisations:** write to `results/` (or the user-specified `--output-dir`) and avoid hard-coded paths elsewhere.
 
-### Test Suite (`tests/`)
+## 🤝 Contributing
 
-#### `test_azure_connection.py`
-Tests Azure OpenAI API connectivity for chat and embedding models.
+1. Branch from `main` and keep PRs scoped by pipeline stage (e.g. loaders vs clustering).
+2. Update relevant documentation — at minimum, reference new behaviour in `CLI_USAGE_GUIDE.md` or `ANALYSIS_RESULTS_CHEATSHEET.md`.
+3. Run unit tests and, when feasible, the integration suite.
+4. Attach sample outputs or screenshots for visual changes.
 
-```bash
-python tests/test_azure_connection.py
-```
+Need deeper algorithmic insight? See `TECHNICAL_DETAILS.md` for scoring heuristics, graph metrics, and rationale for the current clustering defaults.
 
 #### `test_cluster.py`
 Tests clustering algorithms used for deduplication.
@@ -235,7 +211,7 @@ cp .env.template .env
 # Edit .env with your keys
 
 # Test setup
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 ### 2. Make Changes
@@ -251,10 +227,10 @@ Edit the relevant files:
 
 ```bash
 # Test configuration
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 
 # Run with skip-eval for faster iteration
-python innovation_resolution.py --skip-eval
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --skip-eval
 
 # Test specific features
 python -c "from innovation_utils import function_name; test_code()"
@@ -349,16 +325,16 @@ def test_function():
 ### Integration Tests
 Test API connectivity and end-to-end flows:
 ```bash
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 ### Manual Testing
 ```bash
 # Quick test run
-python innovation_resolution.py --skip-eval --no-cache
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --skip-eval --no-cache
 
 # Full test run
-python innovation_resolution.py
+PYTHONPATH=src python -m innovation_platform.innovation_resolution
 ```
 
 ## 📝 Code Style
@@ -428,7 +404,7 @@ print(json.dumps(config, indent=2))
 
 ### Test API Calls
 ```python
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 ### Inspect Data

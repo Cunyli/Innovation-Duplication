@@ -1,82 +1,26 @@
-# Documentation Index# Documentation
+# Documentation Index
 
+Welcome to the documentation for the **Innovation Platform**. The guides below have been consolidated so you can find the essentials quickly.
 
+## 🎯 Start Here
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** — Install dependencies, configure Azure keys, run your first pipeline.
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** — Project architecture, data pipeline modules, evaluation and testing tips.
 
-Welcome to the VTT Innovation Resolution documentation!Complete documentation for the Innovation-Duplication project.
+## ⚙️ Operate the CLI & Automations
+- **[CLI_USAGE_GUIDE.md](CLI_USAGE_GUIDE.md)** — One-stop reference for pipeline flags, scripted workflows, and automation patterns.
 
+## 📊 Understand Outputs
+- **[ANALYSIS_RESULTS_CHEATSHEET.md](ANALYSIS_RESULTS_CHEATSHEET.md)** — What each artifact contains, how to export bespoke reports, and how to serve the static dashboard.
 
+## 🧠 Methodology
+- **[CLUSTERING_GUIDE.md](CLUSTERING_GUIDE.md)** — Clustering strategies (HDBSCAN, K-Means, graph methods) and when to use them.
+- **[DATA_STRUCTURES.md](DATA_STRUCTURES.md)** — Core node/relationship schemas powering the knowledge graph.
 
-## 📖 Core Documentation## 📚 Documentation Files
+## 📚 Additional References
+- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** — Algorithmic deep dive and design rationale.
+- **[DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md)** — Historical refactor notes; kept for context but key points are summarized in `DEVELOPMENT.md`.
 
-
-
-### For Users| Document | Description | Read Time |
-
-|----------|-------------|-----------|
-
-| Document | Description | Read Time || **[GETTING_STARTED.md](GETTING_STARTED.md)** | Setup, configuration, and first run | 10 min |
-
-|----------|-------------|-----------|| **[DEVELOPMENT.md](DEVELOPMENT.md)** | Project structure and development guide | 15 min |
-
-| **[Getting Started](GETTING_STARTED.md)** | Setup, installation, and first run | 10 min || **[DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md)** | Data pipeline modularization guide | 20 min |
-
-| **[Clustering Guide](CLUSTERING_GUIDE.md)** | Understanding clustering methods | 10 min || **[CLUSTERING.md](CLUSTERING.md)** | Graph clustering algorithms | 10 min |
-
-
-
-### For Developers## 🚀 Quick Links
-
-
-
-| Document | Description | Read Time |### I want to...
-
-|----------|-------------|-----------|- **Get started quickly** → [GETTING_STARTED.md](GETTING_STARTED.md)
-
-| **[Development Guide](DEVELOPMENT.md)** | Project structure & workflow | 15 min |- **Understand the code** → [DEVELOPMENT.md](DEVELOPMENT.md#project-structure)
-
-| **[Technical Details](TECHNICAL_DETAILS.md)** | Deep dive into core algorithms | 20 min |- **Learn about refactoring** → [DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md)
-
-| **[Data Pipeline Refactoring Guide](DATA_PIPELINE_REFACTORING_GUIDE.md)** | Architecture & design patterns | 20 min |- **Configure API keys** → [GETTING_STARTED.md](GETTING_STARTED.md#configure-environment)
-
-- **Test my setup** → [GETTING_STARTED.md](GETTING_STARTED.md#test-configuration)
-
-## 🚀 Quick Navigation- **Troubleshoot issues** → [GETTING_STARTED.md](GETTING_STARTED.md#troubleshooting)
-
-- **Add new features** → [DEVELOPMENT.md](DEVELOPMENT.md#adding-new-features)
-
-**I want to...**
-
-## 📖 Reading Guide
-
-- **Get started quickly** → [Getting Started](GETTING_STARTED.md)
-
-- **Understand clustering** → [Clustering Guide](CLUSTERING_GUIDE.md)### New Users (Start Here!)
-
-- **Understand the code** → [Technical Details](TECHNICAL_DETAILS.md)1. Read [GETTING_STARTED.md](GETTING_STARTED.md) (10 min)
-
-- **Contribute code** → [Development Guide](DEVELOPMENT.md)2. Follow the setup steps
-
-- **Learn the architecture** → [Data Pipeline Refactoring Guide](DATA_PIPELINE_REFACTORING_GUIDE.md)3. Run your first analysis
-
-4. Explore the results
-
-## 📚 Document Overview
-
-### Developers
-
-### Getting Started Guide1. Review [GETTING_STARTED.md](GETTING_STARTED.md) for setup
-
-**Target Audience:** New users, data scientists  2. Study [DEVELOPMENT.md](DEVELOPMENT.md) for architecture
-
-**Content:**3. Read [DATA_PIPELINE_REFACTORING_GUIDE.md](DATA_PIPELINE_REFACTORING_GUIDE.md) for data pipeline modules
-
-- Environment setup4. Check component-specific READMEs:
-
-- Configuration   - [config/README.md](../config/README.md) - Configuration API
-
-- Running the pipeline   - [tests/README.md](../tests/README.md) - Test suite
-
-- Troubleshooting
+> **Tip:** Need a quick command? Jump to the task-based checklist in `CLI_USAGE_GUIDE.md`. Looking for specific output files? See the tables in `ANALYSIS_RESULTS_CHEATSHEET.md`.
 
 ## 🎯 Key Sections
 

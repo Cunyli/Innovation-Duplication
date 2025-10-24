@@ -10,22 +10,22 @@ Complete setup and configuration guide for the Innovation-Duplication project.
 
 ## 🚀 Quick Setup (5 minutes)
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Configure environment variables
 
-Copy the template:
 ```bash
 cp .env.template .env
 ```
 
-Edit `.env` with your Azure credentials:
+Fill in `.env`:
+
 ```bash
-# Required
+# Required for the pipeline
 AZURE_OPENAI_API_KEY=your-api-key-here
 AZURE_OPENAI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
 AZURE_OPENAI_API_VERSION=2025-01-01-preview
@@ -33,42 +33,68 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
 
-# Optional (for chatbot only)
+# Optional – enables the Streamlit chatbot tab
 AZURE_AI_SEARCH_KEY=
 AZURE_AI_SEARCH_ENDPOINT=
 AZURE_AI_SEARCH_INDEX_NAME=innovation-index
 ```
 
-### 3. Test Configuration
+### 3. Verify connectivity
 
 ```bash
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 Expected output:
+
 ```
 ✅ Chat Model (GPT-4o-mini)
 ✅ Embedding Model (text-embedding-3-small)
 🎉 All tests passed!
 ```
 
+If the script cannot find your deployment, confirm you used the **deployment name** (Azure portal → Model deployments), not only the model family.
+
+### 4. Optional smoke checks
+
+- Unit tests: `PYTHONPATH=src pytest tests/unit`
+- Data sanity: ensure `data/dataframes/` and each `data/graph_docs_*` folder exists
+
 ## 🎯 First Run
 
-### Option 1: Explore Data
+### Option 1: Explore the raw data
+
 ```bash
-jupyter notebook introduction_data.ipynb
+jupyter notebook notebooks/introduction_data.ipynb
 ```
 
-### Option 2: Run Analysis
+### Option 2: Execute the full pipeline
+
 ```bash
-python innovation_resolution.py
+PYTHONPATH=src python -m innovation_platform.innovation_resolution
 ```
 
-### Option 3: Launch Web App
+Helpful flags:
+
+- `--skip-eval` to iterate faster
+- `--skip-visualization` / `--skip-export` to stop after deduplication
+- `--clustering-method graph_threshold --similarity-threshold 0.88` for graph-based clustering
+
+### Option 3: Launch the Streamlit app
+
 ```bash
 streamlit run app.py
 ```
-Open http://localhost:8501
+
+Open http://localhost:8501 and follow the on-screen prompts. The chatbot requires Azure AI Search credentials.
+
+### Option 4: Serve generated artifacts
+
+```bash
+./start_server.sh 8000   # pass a different port if needed
+```
+
+The script verifies the `results/` folder and prints direct links to the HTML and PNG outputs.
 
 ## ⚙️ Configuration Details
 
@@ -110,17 +136,19 @@ AZURE_AI_SEARCH_INDEX_NAME=innovation-index
 
 ```bash
 # Standard run
-python innovation_resolution.py
+PYTHONPATH=src python -m innovation_platform.innovation_resolution
 
 # Fast run (skip evaluation)
-python innovation_resolution.py --skip-eval
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --skip-eval
 
 # Custom cache location
-python innovation_resolution.py --cache-path "./cache/embeddings.json"
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --cache-path "./cache/embeddings.json"
 
 # Disable caching
-python innovation_resolution.py --no-cache
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --no-cache
 ```
+
+See **CLI_USAGE_GUIDE.md** for a full breakdown of flags, presets, and automation recipes.
 
 **All options:**
 - `--cache-type TYPE` - Cache type (default: embedding)
@@ -158,7 +186,7 @@ AZURE_OPENAI_ENDPOINT=https://xxx.cognitiveservices.azure.com/
 ### Connection test fails
 ```bash
 # Run diagnostic
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 Common issues:
@@ -177,7 +205,7 @@ The config loader automatically uses `.env` if available, falls back to JSON.
 
 ### Manual Migration
 1. Copy values from `azure_config.json` to `.env`
-2. Test with `python tests/test_azure_connection.py`
+2. Test with `python tests/integration/test_azure_connection.py`
 3. Keep JSON as backup until verified
 
 **Old format:**
@@ -212,7 +240,7 @@ config = load_config()
 
 ## 📊 What the Analysis Does
 
-When you run `python innovation_resolution.py`:
+When you run `PYTHONPATH=src python -m innovation_platform.innovation_resolution`:
 
 1. ✅ Loads innovation data from multiple sources
 2. ✅ Generates embeddings using Azure OpenAI

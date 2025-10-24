@@ -45,35 +45,32 @@ The data has been preprocessed into structured graph documents containing:
 
 ```
 Innovation-Duplication/
-├── config/                     # ⭐ Configuration management
-│   ├── config_loader.py        # Unified config loader (.env + JSON)
-│   └── generate_config_from_toml.py
-├── tests/                      # ⭐ Test suite
-│   ├── test_azure_connection.py
-│   └── test_cluster.py         # Clustering algorithm tests
-├── docs/                       # ⭐ Documentation
-│   ├── GETTING_STARTED.md      # Quick setup guide
-│   ├── DEVELOPMENT.md          # Development guide
-│   ├── CLUSTERING.md           # Clustering algorithms guide
-│   └── README.md               # Documentation index
-├── data/                       # Data files (git-ignored)
-│   ├── dataframes/             # Source dataframes
-│   ├── entity_glossary/        # Organization name resolution
-│   ├── graph_docs/             # Extracted relationship data
-│   └── keys/                   # API configuration files
-├── evaluation/                 # Evaluation files
-├── results/                    # Output results
-├── utils/                      # Utility modules
-│   └── cluster/                # ⭐ Clustering algorithms
-│       ├── cluster_algorithms.py  # Vector-based clustering
-│       └── graph_clustering.py    # Graph-based clustering
-├── .env                        # ⭐ Environment configuration (git-ignored)
-├── .env.template               # Configuration template
-├── app.py                      # 🚀 Streamlit web application
-├── innovation_resolution.py    # 🚀 Main analysis script
-├── evaluation.py               # Evaluation module
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+├── src/
+│   └── innovation_platform/
+│       ├── config/                 # Config loaders & generators
+│       ├── core/                   # Caching utilities
+│       ├── data_pipeline/          # Loaders & processors
+│       ├── utils/                  # Shared helpers (e.g., clustering)
+│       ├── innovation_resolution.py
+│       ├── innovation_utils.py
+│       ├── local_entity_processing.py
+│       └── vis.py
+├── scripts/                        # CLI helpers & exploratory scripts
+│   ├── analyze_clustering_usage.py
+│   ├── demo_clustering_comparison.py
+│   ├── introduction_data.py
+│   └── verify_information_preservation.py
+├── tests/                          # Pytest suite
+│   ├── integration/
+│   └── unit/
+├── data/                           # Source datasets & keys (git-ignored)
+├── results/                        # Generated artefacts (visuals, exports)
+├── notebooks/                      # Jupyter notebooks for analysis
+├── docs/                           # Project documentation
+├── app.py                          # Streamlit entry point
+├── start_server.sh                 # Static results server helper
+├── requirements.txt                # Python dependencies
+└── README.md                       # This file
 ```
 
 **💡 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed structure documentation.**
@@ -102,7 +99,7 @@ Innovation-Duplication/
 
 4. **Test configuration:**
    ```bash
-   python tests/test_azure_connection.py
+   python tests/integration/test_azure_connection.py
    ```
 
 **📖 Detailed setup instructions: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)**
@@ -133,7 +130,7 @@ You can also use `data/keys/azure_config.json`:
 
 2. **Run innovation resolution:**
    ```bash
-   python innovation_resolution.py
+   PYTHONPATH=src python -m innovation_platform.innovation_resolution
    ```
 
 3. **Launch web interface:**
@@ -144,7 +141,7 @@ You can also use `data/keys/azure_config.json`:
 ### Command Line Options
 
 ```bash
-python innovation_resolution.py [options]
+PYTHONPATH=src python -m innovation_platform.innovation_resolution [options]
 
 Options:
   --cache-type TYPE      Cache type (default: embedding)
@@ -158,16 +155,16 @@ Options:
 **Examples:**
 ```bash
 # Standard run
-python innovation_resolution.py
+PYTHONPATH=src python -m innovation_platform.innovation_resolution
 
 # Fast run (skip evaluation)
-python innovation_resolution.py --skip-eval
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --skip-eval
 
 # Custom cache location
-python innovation_resolution.py --cache-path "./data/cache/embeddings.json"
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --cache-path "./data/cache/embeddings.json"
 
 # No caching (regenerate all)
-python innovation_resolution.py --no-cache
+PYTHONPATH=src python -m innovation_platform.innovation_resolution --no-cache
 ```
 
 ## 🔧 What the Script Does
@@ -185,7 +182,7 @@ python innovation_resolution.py --no-cache
 
 ```bash
 # Test Azure API connection
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 
 # Test clustering algorithms
 python tests/test_cluster.py
@@ -392,7 +389,7 @@ To use the evaluation module, you can:
    - Create `evaluation/gold_relations.json` with the format: `[{"innovation": "...", "organization": "...", "relation": "DEVELOPED_BY"}, ...]`
 
 2. **Run the Evaluation**:
-   - Execute `python innovation_resolution.py` to run the complete pipeline with evaluation
+   - Execute `PYTHONPATH=src python -m innovation_platform.innovation_resolution` to run the complete pipeline with evaluation
    - For the first run, consistency checking samples will be generated
    - Fill in the `human_label` column in the generated CSV file
    - Run the script again to calculate the consistency rate
@@ -453,4 +450,3 @@ This project is part of the AaltoAI Hackathon in collaboration with VTT.
 ---
 
 **📚 [Documentation](docs/README.md)** | **🚀 [Getting Started](docs/GETTING_STARTED.md)** | **🛠️ [Development Guide](docs/DEVELOPMENT.md)**
-

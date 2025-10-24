@@ -2,22 +2,31 @@
 #chatbot，项目介绍
 #引导用户点击
 
+from pathlib import Path
 import os
 import sys
+import warnings
+
 import streamlit as st
 from streamlit.components.v1 import html
-import warnings
+
+# Ensure src directory is on the Python path
+ROOT_DIR = Path(__file__).resolve().parent
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 
 # 抑制所有警告
 warnings.filterwarnings("ignore")
 
 # 尝试生成配置文件（如果文件存在）
 try:
-    config_generator = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generate_config_from_toml.py")
-    if os.path.exists(config_generator):
+    config_generator = SRC_DIR / "innovation_platform" / "config" / "generate_config_from_toml.py"
+    if config_generator.exists():
         print("尝试生成配置文件...")
         import subprocess
-        result = subprocess.run([sys.executable, config_generator], capture_output=True, text=True)
+        result = subprocess.run([sys.executable, str(config_generator)], capture_output=True, text=True)
         if result.returncode == 0:
             print("配置文件生成成功！")
             print(result.stdout)
@@ -29,13 +38,11 @@ except Exception as e:
     print(f"尝试生成配置文件时出错: {str(e)}")
 
 # 创建数据目录和密钥目录（如果不存在）
-data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-keys_dir = os.path.join(data_dir, "keys")
-os.makedirs(keys_dir, exist_ok=True)
+data_dir = ROOT_DIR / "data"
+keys_dir = data_dir / "keys"
+keys_dir.mkdir(parents=True, exist_ok=True)
 
-
-
-from innovation_resolution import chat_bot
+from innovation_platform.innovation_resolution import chat_bot
 
 # ----------------------------
 # Page Config & Title
@@ -60,10 +67,11 @@ st.markdown("""
 """)
 
 from PIL import Image
-import os
+
+RESULTS_DIR = ROOT_DIR / "results"
 
 @st.cache_data
-def load_image(path):
+def load_image(path: Path):
     return Image.open(path)
 
 #wanchengle
@@ -72,8 +80,8 @@ st.header("🌐 Network Graph Visualizations")
 
 
 #在ein的本地
-html_path = "results/innovation_network_3d.html"
-if os.path.exists(html_path):
+html_path = RESULTS_DIR / "innovation_network_3d.html"
+if html_path.exists():
     st.subheader("Interactive Network (Before Dedupulication)")
     with open(html_path, "r", encoding="utf-8") as f:
         html(f.read(), height=600)
@@ -93,8 +101,8 @@ These visualizations represent the relationships between innovations and organiz
 Hover or zoom to explore the connections. The layout is generated based on semantic clustering.
 """)
 
-html_path = "results/innovation_network_tufte_3D.html"
-if os.path.exists(html_path):
+html_path = RESULTS_DIR / "innovation_network_tufte_3D.html"
+if html_path.exists():
     st.subheader("3D Interactive Network (After Dedupulication)")
     with open(html_path, "r", encoding="utf-8") as f:
         html(f.read(), height=600)
@@ -117,8 +125,8 @@ These charts summarize statistical patterns in the innovation network:
 """)
 
 
-img_path = "results/innovation_network_tufte_2D.png"
-if os.path.exists(img_path):
+img_path = RESULTS_DIR / "innovation_network_tufte_2D.png"
+if img_path.exists():
     img = load_image(img_path)
     st.subheader("2D Network Snapshot")
     st.image(img, use_container_width=True)
@@ -133,8 +141,8 @@ col1, col2 = st.columns(2)
 
 with col2:
     st.subheader("Key Innovation Statistics")
-    img_stat = "results/innovation_stats_tufte.png"
-    if os.path.exists(img_stat):
+    img_stat = RESULTS_DIR / "innovation_stats_tufte.png"
+    if img_stat.exists():
         img = load_image(img_stat)
         st.image(img, use_container_width=True)
         st.markdown("""
@@ -148,8 +156,8 @@ with col2:
 
 with col1:
     st.subheader("Top Contributing Organizations")
-    img_top_orgs = "results/top_organizations.png"
-    if os.path.exists(img_top_orgs):
+    img_top_orgs = RESULTS_DIR / "top_organizations.png"
+    if img_top_orgs.exists():
         img = load_image(img_top_orgs)
         st.image(img, use_container_width=True)
         st.markdown("""

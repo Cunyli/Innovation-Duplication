@@ -9,7 +9,7 @@ Tests Azure OpenAI API connections for both chat and embedding models.
 
 **Usage:**
 ```bash
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 ```
 
 **What it tests:**
@@ -30,7 +30,7 @@ python tests/test_cluster.py
 
 ```bash
 # Run individual test
-python tests/test_azure_connection.py
+python tests/integration/test_azure_connection.py
 
 # Or run from project root
 python -m tests.test_azure_connection
