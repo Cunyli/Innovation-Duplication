@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,15 @@ from .innovation_resolution import create_query_engine
 
 # Step order is important
 DEFAULT_STEPS = ["load", "dedupe", "graph", "analyze", "visualize", "export", "query", "eval"]
+STEP_DEPENDENCIES = {
+    "dedupe": {"load"},
+    "graph": {"load", "dedupe"},
+    "analyze": {"load", "dedupe", "graph"},
+    "visualize": {"load", "dedupe", "graph", "analyze"},
+    "export": {"load", "dedupe", "graph", "analyze"},
+    "query": {"load", "dedupe", "graph"},
+    "eval": {"load", "dedupe", "graph", "analyze", "export"},
+}
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS_DIR = PROJECT_ROOT / "results"
@@ -74,6 +84,8 @@ class PipelineRunner:
         self.llm = None
         self.embedding_model = None
         self.completed_steps: List[str] = []
+        self.force_steps: Set[str] = set(self.args.force_steps or [])
+        self.analysis_results_path = self.output_dir / "analysis_results.pkl"
         self.current_snapshot = self._collect_input_snapshot()
         self.previous_snapshot = self._load_previous_snapshot()
         self.input_changes = self._diff_snapshots(self.previous_snapshot, self.current_snapshot)
@@ -82,12 +94,14 @@ class PipelineRunner:
     def run(self) -> None:
         self._prepare_environment()
         skip_steps = self._maybe_resume()
-
-        selected_steps = self.args.steps or DEFAULT_STEPS
+        selected_steps = self._resolve_steps(self.args.steps)
+        selected_set = set(selected_steps) | self.force_steps
+        selected_steps = [step for step in DEFAULT_STEPS if step in selected_set]
         for step in DEFAULT_STEPS:
             if step not in selected_steps:
                 continue
-            if step in skip_steps:
+            force_current = step in self.force_steps
+            if step in skip_steps and not force_current:
                 print(f"[skip] Step '{step}' already satisfied (resume).")
                 self.completed_steps.append(step)
                 continue
@@ -99,6 +113,48 @@ class PipelineRunner:
 
         self._write_state()
         print("\n✅ Pipeline completed.")
+
+    def _load_analysis_results_from_disk(self) -> Optional[Dict]:
+        if not self.analysis_results_path.exists():
+            return None
+        try:
+            with self.analysis_results_path.open("rb") as fh:
+                return pickle.load(fh)
+        except Exception as exc:
+            print(f"⚠️  Failed to load cached analysis results: {exc}")
+            return None
+
+    def _save_analysis_results_to_disk(self) -> None:
+        if not self.context.analysis_results:
+            return
+        try:
+            with self.analysis_results_path.open("wb") as fh:
+                pickle.dump(self.context.analysis_results, fh)
+        except Exception as exc:
+            print(f"⚠️  Failed to persist analysis results: {exc}")
+
+    def _resolve_steps(self, requested: Optional[List[str]]) -> List[str]:
+        """
+        Expand user-requested steps so dependencies are included automatically.
+        """
+        if not requested:
+            return DEFAULT_STEPS
+
+        required: Set[str] = set()
+
+        def add_with_deps(step: str) -> None:
+            if step in required:
+                return
+            if step not in DEFAULT_STEPS:
+                raise ValueError(f"Unknown step '{step}'")
+            for dep in STEP_DEPENDENCIES.get(step, set()):
+                add_with_deps(dep)
+            required.add(step)
+
+        for step in requested:
+            add_with_deps(step)
+
+        return [step for step in DEFAULT_STEPS if step in required]
 
     def _prepare_environment(self) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -131,10 +187,18 @@ class PipelineRunner:
             self.context.consolidated_graph = json.load(f)
         with self.canonical_mapping_path.open("r", encoding="utf-8") as f:
             self.context.canonical_mapping = json.load(f)
+        cached_analysis = self._load_analysis_results_from_disk()
+        if cached_analysis:
+            self.context.analysis_results = cached_analysis
 
         if not self.snapshot_changed:
             print("🛌  Input data unchanged. Skipping load/dedupe/graph/analyze/visualize/export.")
-            return {"load", "dedupe", "graph", "analyze", "visualize", "export"}
+            skip_all = {"load", "dedupe", "graph", "analyze", "visualize", "export"}
+            if not self.context.analysis_results:
+                skip_all.discard("analyze")
+                skip_all.discard("visualize")
+                skip_all.discard("export")
+            return skip_all
 
         if self.input_changes:
             print(f"🔄 Detected {len(self.input_changes)} modified or new input files.")
@@ -188,12 +252,15 @@ class PipelineRunner:
             max_iter=self.args.max_iter,
             print_summary=True,
         )
+        self._save_analysis_results_to_disk()
 
     def _step_visualize(self) -> None:
         if self.args.skip_visualization:
             print("[skip] Visualisation disabled via flag.")
             return
         print("\n[5/8] Generating visualisations...")
+        if not self.context.analysis_results:
+            self.context.analysis_results = self._load_analysis_results_from_disk()
         if not self.context.analysis_results:
             raise RuntimeError("Analysis results missing.")
         visualize_network_tufte(self.context.analysis_results)
@@ -203,6 +270,8 @@ class PipelineRunner:
             print("[skip] Export disabled via flag.")
             return
         print("\n[6/8] Exporting artefacts...")
+        if not self.context.analysis_results:
+            self.context.analysis_results = self._load_analysis_results_from_disk()
         if not (self.context.analysis_results and self.context.consolidated_graph and self.context.canonical_mapping):
             raise RuntimeError("Missing artefacts required for export.")
         export_results(
@@ -435,6 +504,12 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         choices=DEFAULT_STEPS,
         help="Subset of steps to execute (default: entire pipeline).",
+    )
+    parser.add_argument(
+        "--force-steps",
+        nargs="+",
+        choices=DEFAULT_STEPS,
+        help="Specific steps that should run even if resume logic would skip them.",
     )
     parser.add_argument("--skip-visualization", action="store_true", help="Skip visualisation step.")
     parser.add_argument("--skip-export", action="store_true", help="Skip export step.")
