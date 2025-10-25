@@ -104,6 +104,18 @@ Innovation-Duplication/
 
 **📖 Detailed setup instructions: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)**
 
+### One-command Pipeline
+
+Once configured, you can execute the full workflow (data → dedupe → analysis → visualisation → query warm-up) via:
+
+```bash
+PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume
+```
+
+- `--resume` reuses existing consolidated graphs and embeddings when available.
+- `--sample-query "hydrogen fuel cell"` prints a semantic search preview.
+- `--with-eval` runs the optional evaluation suite (requires Azure OpenAI configuration).
+
 ### Legacy Configuration (Optional)
 
 You can also use `data/keys/azure_config.json`:

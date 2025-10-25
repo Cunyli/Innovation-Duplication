@@ -57,6 +57,17 @@ Innovation-Duplication/
 7. **Export** JSON summaries/PNGs/HTML (`export_results`).
 8. **Evaluate** predictions against gold templates (`run_all_evaluations`) — optional.
 
+### Semantic query layer
+- `InnovationQueryEngine` builds textual representations for each canonical innovation, embeds them (with caching), and supports cosine-similarity search.
+- Use `query_innovations(consolidated_graph, "my query")` for a quick lookup or instantiate the engine directly for repeated queries.
+
+### Orchestration with `pipeline_runner`
+Run `PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume` to execute the full workflow. The runner:
+
+- Detects existing artefacts (consolidated graph, canonical mapping, embedding caches) and skips redundant steps unless `--force` is passed.
+- Provides flags such as `--sample-query` to warm up the semantic search and `--with-eval` to trigger the evaluation suite.
+- Records the last run in `.pipeline_state.json`, making it easy to track when artefacts were refreshed.
+
 Each step can be toggled via the CLI `--steps` argument or dedicated skip-flags. The defaults execute everything except the Streamlit front-end.
 
 ## 📦 Data & Artifacts
