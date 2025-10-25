@@ -111,6 +111,18 @@ Follow up with `--steps analyze visualize` on the most promising run.
 - **Scripts**: Utilities in `scripts/` (e.g., `analyze_clustering_usage.py`) honour the new `src` layout by appending `PYTHONPATH=src` when executed.
 - **Automation**: When scheduling via cron or GitHub Actions, remember to export `PYTHONPATH=src` and point `AZURE_*` env vars at secure secrets storage.
 
+## 🤖 Pipeline Runner
+
+For an even higher-level automation, use:
+
+```bash
+PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume --sample-query "hydrogen fuel cell"
+```
+
+- Skips load/dedupe/graph when `results/consolidated_graph.json` already exists (unless `--force` is supplied).
+- Supports the same skip flags (`--skip-visualization`, `--skip-export`) plus evaluation hooks (`--with-eval`, `--auto-label`).
+- Warms up the semantic query engine and prints a sample query result so you know everything is in sync.
+
 ## ✅ Checklist Before Running in Production
 
 - [ ] `.env` has the correct Azure deployment names and endpoint.

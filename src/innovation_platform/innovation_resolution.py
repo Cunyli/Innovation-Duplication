@@ -27,6 +27,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 
 from .vis import visualize_network_tufte
+from .query_engine import InnovationQueryEngine, QueryResult
 
 from langchain_openai import AzureChatOpenAI
 from langchain_openai import AzureOpenAIEmbeddings
@@ -311,6 +312,37 @@ def create_innovation_knowledge_graph(df_relationships: pd.DataFrame, canonical_
     """
     from .data_pipeline.processors import create_consolidated_knowledge_graph
     return create_consolidated_knowledge_graph(df_relationships, canonical_mapping)
+
+
+def create_query_engine(
+    consolidated_graph: Dict,
+    embedding_model=None,
+    cache_config: Optional[Dict] = None,
+) -> InnovationQueryEngine:
+    """Create a semantic search engine on top of the consolidated graph."""
+
+    return InnovationQueryEngine(
+        consolidated_graph=consolidated_graph,
+        embedding_model=embedding_model,
+        cache_config=cache_config,
+    )
+
+
+def query_innovations(
+    consolidated_graph: Dict,
+    query: str,
+    top_k: int = 5,
+    embedding_model=None,
+    cache_config: Optional[Dict] = None,
+) -> List[QueryResult]:
+    """Convenience wrapper to search innovations directly."""
+
+    engine = create_query_engine(
+        consolidated_graph=consolidated_graph,
+        embedding_model=embedding_model,
+        cache_config=cache_config,
+    )
+    return engine.search(query=query, top_k=top_k)
 
 
 def analyze_innovation_network(consolidated_graph: Dict, top_n: int = 10, max_iter: int = 1000, print_summary: bool = False) -> Dict:

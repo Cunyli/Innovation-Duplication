@@ -96,6 +96,16 @@ Open http://localhost:8501 and follow the on-screen prompts. The chatbot require
 
 The script verifies the `results/` folder and prints direct links to the HTML and PNG outputs.
 
+### Option 5: Run the automated pipeline
+
+```bash
+PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume
+```
+
+- `--resume` skips straight to analysis/visualisation when `results/consolidated_graph.json` already exists.
+- `--sample-query "battery recycling"` prints a semantic search preview.
+- `--with-eval --auto-label` triggers the evaluation suite (requires Azure OpenAI credentials).
+
 ## ⚙️ Configuration Details
 
 ### Azure OpenAI Settings
