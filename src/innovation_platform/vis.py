@@ -121,26 +121,18 @@ def visualize_network_tufte_2D(analysis_results: dict):
 
 def visualize_network_tufte_3D(analysis_results: dict):
     """
-    Tufte 风格的 3D 交互网络图，可视化最核心节点（如只展示前 50 节点，避免过度拥挤）：
-      - 使用 Plotly 3D Scatter
-      - 仅标记最重要的局部，让评委专注而不过度分散注意力
-    Args:
-        analysis_results: analyze_innovation_network() 返回的字典
+    Tufte 风格的 3D 交互网络图，可视化最核心节点（如只展示前 50 节点，避免过度拥挤）。
     """
     G: nx.Graph = analysis_results['graph']
 
-    # 如果网络节点超多，可先提取前 50 或前若干度数最高节点的子图
     if len(G.nodes) > 100:
-        # 以 degree 排序，取前 50
         top_nodes = sorted(G.nodes(), key=lambda n: G.degree(n), reverse=True)[:50]
         subG = G.subgraph(top_nodes).copy()
     else:
         subG = G
 
-    # 1. 3D 布局（固定 seed）
     pos_3d = nx.spring_layout(subG, dim=3, k=0.15, iterations=50, seed=42)
 
-    # 2. 提取坐标与属性
     x_nodes = [pos_3d[n][0] for n in subG.nodes()]
     y_nodes = [pos_3d[n][1] for n in subG.nodes()]
     z_nodes = [pos_3d[n][2] for n in subG.nodes()]
@@ -151,6 +143,19 @@ def visualize_network_tufte_3D(analysis_results: dict):
     node_colors = []
     node_sizes = []
     node_labels = []
+    display_names = {}
+
+    def _get_display_name(node_id: str) -> str:
+        data = subG.nodes[node_id]
+        if data.get('type') == 'Organization':
+            return data.get('name') or node_id
+        names = data.get('names')
+        if isinstance(names, (list, tuple)) and names:
+            return names[0]
+        if isinstance(names, str) and names.strip():
+            return names
+        return data.get('name') or node_id
+
     for n in subG.nodes():
         ntype = node_types.get(n, 'Unknown')
         if ntype == 'Innovation':
@@ -164,17 +169,17 @@ def visualize_network_tufte_3D(analysis_results: dict):
             node_sizes.append(5)
             node_colors.append(COLOR_PALETTE['Unknown'])
 
-        # 仅最重要节点显示标签
-        if n in [nd for nd, _ in analysis_results['key_innovations'][:3]] \
-           or n in [nd for nd, _ in analysis_results['key_orgs'][:3]]:
-            label = (subG.nodes[n].get('name') 
-                     if subG.nodes[n].get('type') == 'Organization' 
-                     else subG.nodes[n].get('names', n))
+        display_name = _get_display_name(n)
+        display_names[n] = display_name
+
+        if ntype == 'Innovation':
+            label = display_name
+        elif n in [nd for nd, _ in analysis_results['key_orgs'][:3]]:
+            label = display_name
         else:
-            label = ""
+            label = ''
         node_labels.append(label)
 
-    # 3. 边 trace（按类型分组）
     edge_traces = []
     edge_types = {
         'DEVELOPED_BY': COLOR_PALETTE['Edge_Developed'],
@@ -198,11 +203,66 @@ def visualize_network_tufte_3D(analysis_results: dict):
                 )
             )
 
-    # 4. 节点 trace
-    hover_texts = [
-        f"{subG.nodes[n].get('name', subG.nodes[n].get('names', n))}<br>Type: {subG.nodes[n].get('type','Unknown')}"
-        for n in subG.nodes()
-    ]
+    def _first_description(node_id: str) -> str:
+        data = subG.nodes[node_id]
+        desc = data.get('descriptions')
+        if isinstance(desc, (list, tuple)) and desc:
+            return str(desc[0])
+        if isinstance(desc, str):
+            return desc
+        return ""
+
+    def _neighbor_strength(node: str, neighbor: str) -> float:
+        edge_data = subG.get_edge_data(node, neighbor, default={})
+        rel_type = edge_data.get('type', '')
+        type_boost = 2.0 if rel_type == 'DEVELOPED_BY' else 1.0
+        degree_boost = subG.degree(neighbor)
+        source_boost = sources_counts.get(neighbor, 0) if node_types.get(neighbor) == 'Innovation' else 0
+        weight = type_boost * (1 + degree_boost) + 0.2 * source_boost
+        return float(weight)
+
+    neighbor_weight = {}
+    for node in subG.nodes():
+        weight = {}
+        for nb in subG.neighbors(node):
+            weight[nb] = _neighbor_strength(node, nb)
+        neighbor_weight[node] = weight
+
+    def _format_neighbor_lines(node: str) -> str:
+        weights = neighbor_weight.get(node, {})
+        if not weights:
+            return ""
+        ranked = sorted(weights.items(), key=lambda kv: (-kv[1], kv[0]))
+        lines = []
+        for nb, w in ranked[:6]:
+            nb_type = subG.nodes[nb].get('type', 'Unknown')
+            nb_desc = _first_description(nb)
+            if len(nb_desc) > 160:
+                nb_desc = nb_desc[:160].rstrip() + "…"
+            rank_text = f"{display_names.get(nb, nb)} ({nb_type}) · Strength {w:.1f}"
+            if nb_desc:
+                rank_text += f"<br>&nbsp;&nbsp;{nb_desc}"
+            lines.append(rank_text)
+        remaining = len(weights) - len(ranked[:6])
+        if remaining > 0:
+            lines.append(f"...还有 {remaining} 个邻居")
+        return "<br>".join(lines)
+
+    hover_texts = []
+    for n in subG.nodes():
+        base_text = [f"<b>{display_names.get(n, n)}</b>"]
+        node_type = subG.nodes[n].get('type', 'Unknown')
+        base_text.append(f"Type: {node_type}")
+        node_desc = _first_description(n)
+        if node_desc:
+            base_text.append(f"Description: {node_desc}")
+
+        neighbor_lines = _format_neighbor_lines(n)
+        if neighbor_lines:
+            base_text.append("<br><b>Neighbors (ranked)</b>")
+            base_text.append(neighbor_lines)
+
+        hover_texts.append("<br>".join(base_text))
     nodes_trace = go.Scatter3d(
         x=x_nodes, y=y_nodes, z=z_nodes,
         mode='markers+text',
@@ -216,10 +276,9 @@ def visualize_network_tufte_3D(analysis_results: dict):
         ),
         hoverinfo='text',
         hovertext=hover_texts,
-        name="Nodes"
+        name='Nodes'
     )
 
-    # 5. 组合并渲染
     fig = go.Figure(data=[nodes_trace] + edge_traces)
     fig.update_layout(
         title='VTT Innovation Network (3D Subgraph)',
@@ -229,24 +288,29 @@ def visualize_network_tufte_3D(analysis_results: dict):
             zaxis=dict(showticklabels=False, title=''),
             camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
         ),
-        margin=dict(l=0, r=0, b=0, t=40),
+        margin=dict(l=0, r=0, b=120, t=40),
         legend=dict(title_text='Relation Types', x=0, y=1, bgcolor='rgba(255,255,255,0.5)')
     )
 
-    # 6. 保存交互式 HTML（比 PNG 更好用：支持旋转、缩放、悬停查看详情）
+    formula_text = (
+        "Strength = (1 + degree(neighbor)) × type_boost + 0.2 × sources_count "
+        "(type_boost = 2 for DEVELOPED_BY edges, otherwise 1)"
+    )
+    fig.add_annotation(
+        text=formula_text,
+        showarrow=False,
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=-0.18,
+        xanchor="left",
+        yanchor="top",
+        font=dict(size=11, color="#444444"),
+    )
+
     fig.write_html(os.path.join(RESULTS_DIR, 'innovation_network_tufte_3D.html'))
-    print("✅ 3D network visualization saved: innovation_network_tufte_3D.html")
-    print("   提示：在浏览器中打开可进行交互操作（旋转、缩放、悬停查看详情）")
-    
-    # PNG 生成已禁用（原因：ARM 架构容器不支持 Kaleido/Chrome）
-    # 注：HTML 文件提供了更好的交互体验，无需 PNG
-    # 如需 PNG，可在支持的环境中取消下方注释：
-    # try:
-    #     fig.write_image(os.path.join(RESULTS_DIR, 'innovation_network_tufte_3D.png'),
-    #                     width=1200, height=900)
-    #     print("✅ 3D network PNG image saved: innovation_network_tufte_3D.png")
-    # except Exception as e:
-    #     print(f"⚠️  PNG generation skipped: {e.__class__.__name__}")
+    print('✅ 3D network visualization saved: innovation_network_tufte_3D.html')
+    print('   提示：在浏览器中打开可进行交互操作（旋转、缩放、悬停查看详情）')
 
 def visualize_network_tufte_bar(analysis_results: dict):
     stats = analysis_results['stats']
