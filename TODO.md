@@ -3,6 +3,7 @@
 ### Query & Experience
 - Wrap the semantic query engine in REST or GraphQL endpoints so external systems can retrieve innovations and organisations programmatically.
 - Expose the Streamlit panels as reusable modules (chat, network explorer, metrics) and document the configuration needed to run them on managed hosting (Streamlit Cloud / Azure App Service).
+- Highlight query matches directly inside the 3D HTML: when a search result is clicked, show it (and its neighbours) with stronger colours/edges so analysts can inspect them visually.
 
 ### Evaluation & Quality
 - Design an evaluation harness that scores clustering and deduplication quality (purity, silhouette, pairwise precision/recall) using labelled subsets or synthetic benchmarks.
@@ -19,11 +20,8 @@
 - Introduce data QA checks before the run (schema validation, column presence, basic stats) to catch issues early.
 - Explore asynchronous embedding generation so the main pipeline can queue new documents while reusing cached vectors.
 - Package the system in Docker (with optional GPU support) to simplify deployment in cloud environments.
-<<<<<<< Updated upstream
-=======
 - Add interactive highlighting for the 3D network viz (hover/click to brighten a node + its edges, dim the rest) without sacrificing camera responsiveness; keep this behaviour in sync between standalone HTML files and the Streamlit embedding.
 - Provide a Dockerised graph database (e.g. Neo4j) setup plus an exporter so each pipeline run can push the consolidated graph into the DB for downstream querying/visualisation.
->>>>>>> Stashed changes
 
 ### Advanced Methods
 - Evaluate modern representation learning techniques (e.g., graph neural networks, transformer-based entity matching) as drop-in replacements or augmentations for the current embedding + clustering approach.

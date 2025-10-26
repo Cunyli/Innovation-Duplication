@@ -115,6 +115,19 @@ PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume
 - `--resume` reuses existing consolidated graphs and embeddings when available.
 - `--sample-query "hydrogen fuel cell"` prints a semantic search preview.
 - `--with-eval` runs the optional evaluation suite (requires Azure OpenAI configuration).
+- `--steps ...` lets you run only a subset of stages in their canonical order (e.g. `--steps visualize export`).
+- `--force-steps ...` forces specific stages to run even if `--resume` would normally skip them (useful for regenerating plots without recomputing embeddings).
+
+#### 常用指令 / Pipeline Recipes
+
+| 场景 | 命令 | 说明 |
+|------|------|------|
+| 全量跑一遍（含缓存检测） | `PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume` | 会自动跳过已有 artefact，若输入变更则重新计算。 |
+| 仅刷新可视化（依赖已有 `results/*.json` 和 `analysis_results.pkl`） | `PYTHONPATH=src python -m innovation_platform.pipeline_runner --resume --steps visualize --force-steps visualize` | 先加载缓存的图和分析结果，只重新产出 2D/3D/统计图。若缺失分析结果则会自动补跑 `analyze`。 |
+| 全量强制重跑 | `PYTHONPATH=src python -m innovation_platform.pipeline_runner --force` | 忽略所有缓存（含 embeddings），耗时最长但最干净。 |
+| 指定并强制多个阶段 | `PYTHONPATH=src python -m innovation_platform.pipeline_runner --steps analyze visualize export --force-steps analyze visualize` | 只执行分析、可视化、导出，且分析/可视化一定会重跑；导出阶段仅在输入有变时运行。 |
+
+> 提示：pipeline 会将最近一次分析结果缓存在 `results/analysis_results.pkl` 中。完成一次全量运行后，再次刷新可视化只需几十秒。
 
 ### Legacy Configuration (Optional)
 
